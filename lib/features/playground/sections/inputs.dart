@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/tokens.dart';
+import '../../../core/design/widgets/chips.dart';
 import 'common.dart';
 
 class InputsSection extends StatefulWidget {
@@ -17,6 +18,19 @@ class _InputsSectionState extends State<InputsSection> {
   double _slider = 20;
   final Set<String> _filters = {'قليل المخزون'};
   String _choice = 'اليوم';
+  final Set<String> _row = {'بقالة'};
+  String? _category;
+  String? _supplier;
+  bool _saved = false;
+  List<String> _barcodes = ['6221234567890'];
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   DateTime? _date;
 
   static const _products = [
@@ -104,11 +118,112 @@ class _InputsSectionState extends State<InputsSection> {
         ],
       ),
       SpecSection(
-        title: 'الشرائح',
+        title: 'الشرايح: الأنواع الأربعة',
         m3: 'Chips',
-        spec: 'components/chips',
-        rule: 'Filter لتصفية القوائم، Choice لاختيار واحد، Input للعناصر المختارة.',
+        spec: 'components/chips/guidelines',
+        rule:
+            'Assist لإجراء حسب السياق، Filter للتصفية، Input لحاجة كتبها '
+            'المستخدم، Suggestion لاقتراح من النظام. الشرايح دايماً مجموعة، '
+            'والنص 20 حرف بالكتير. الخطوة الأساسية (إتمام البيع) زرار مش شريحة.',
         children: [
+          Demo([
+            ActionChip(
+              avatar: const Icon(Icons.print_outlined),
+              label: const Text('اطبع'),
+              onPressed: () {},
+            ),
+            FilterChip(
+              label: const Text('قليل المخزون'),
+              selected: true,
+              onSelected: (_) {},
+            ),
+            InputChip(label: const Text('مشروبات'), onDeleted: () {}),
+            ActionChip(label: const Text('سكر'), onPressed: () {}),
+          ]),
+        ],
+      ),
+      SpecSection(
+        title: 'شرايح الإجراء',
+        m3: 'Assist chips',
+        spec: 'components/chips/guidelines#assist-chips',
+        rule:
+            'تحت المحتوى الأساسي، بتبدأ بفعل وأيقونة. ممكن تعرض التقدم '
+            'والتأكيد (احفظ ثم اتحفظت). Elevated بس فوق صورة.',
+        children: [
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(TashilSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'تم البيع: 245.00 ج.م',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: TashilSpacing.md),
+                  Demo([
+                    ActionChip(
+                      avatar: const Icon(Icons.print_outlined),
+                      label: const Text('اطبع الإيصال'),
+                      onPressed: () {},
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.share_outlined),
+                      label: const Text('ابعت واتساب'),
+                      onPressed: () {},
+                    ),
+                    ActionChip(
+                      avatar: Icon(
+                        _saved ? Icons.check : Icons.bookmark_add_outlined,
+                      ),
+                      label: Text(_saved ? 'اتحفظت' : 'احفظ للعميل'),
+                      onPressed: () => setState(() => _saved = !_saved),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          Container(
+            height: 140,
+            alignment: AlignmentDirectional.bottomStart,
+            padding: const EdgeInsets.all(TashilSpacing.md),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(TashilRadius.medium),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF8D6E63), Color(0xFF263238)],
+              ),
+            ),
+            child: Demo([
+              ActionChip.elevated(
+                avatar: const Icon(Icons.photo_camera_outlined),
+                label: const Text('غيّر الصورة'),
+                onPressed: () {},
+              ),
+              ActionChip.elevated(
+                avatar: const Icon(Icons.crop),
+                label: const Text('قص'),
+                onPressed: () {},
+              ),
+            ]),
+          ),
+        ],
+      ),
+      SpecSection(
+        title: 'شرايح التصفية',
+        m3: 'Filter chips',
+        spec: 'components/chips/guidelines#filter-chips',
+        rule:
+            'علامة صح لما تتختار. المجموعة الواحدة يا اختيار واحد يا متعدد، '
+            'مش الاتنين. لو زادت عن صفين تبقى صف واحد بيتسحب. '
+            'ممنوع مجموعة فيها اختيار واحد بس. ChoiceChip ممنوع.',
+        children: [
+          Text('اختيار متعدد', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: TashilSpacing.sm),
           Demo([
             for (final f in const ['قليل المخزون', 'نفد', 'بدون باركود'])
               FilterChip(
@@ -118,23 +233,112 @@ class _InputsSectionState extends State<InputsSection> {
                     setState(() => v ? _filters.add(f) : _filters.remove(f)),
               ),
           ]),
+          const SizedBox(height: TashilSpacing.md),
+          Text('اختيار واحد', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: TashilSpacing.sm),
           Demo([
             for (final c in const ['اليوم', 'الأسبوع', 'الشهر'])
-              ChoiceChip(
+              FilterChip(
                 label: Text(c),
                 selected: _choice == c,
                 onSelected: (_) => setState(() => _choice = c),
               ),
           ]),
+          const SizedBox(height: TashilSpacing.md),
+          Text(
+            'بتفتح قائمة (الشريحة كلها بتفتحها)',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
           const SizedBox(height: TashilSpacing.sm),
           Demo([
-            InputChip(label: const Text('مشروبات'), onDeleted: () {}),
-            ActionChip(
-              avatar: const Icon(Icons.add),
-              label: const Text('تصنيف'),
-              onPressed: () {},
+            MenuFilterChip<String>(
+              label: 'التصنيف',
+              value: _category,
+              options: const {
+                'drinks': 'مشروبات',
+                'grocery': 'بقالة',
+                'cleaning': 'منظفات',
+              },
+              onChanged: (v) => setState(() => _category = v),
             ),
+            MenuFilterChip<String>(
+              label: 'المورد',
+              value: _supplier,
+              options: const {'a': 'الأهرام', 'b': 'النيل للتوزيع'},
+              onChanged: (v) => setState(() => _supplier = v),
+            ),
+          ]),
+          const SizedBox(height: TashilSpacing.md),
+          Text(
+            'صف واحد بيتسحب بالعرض',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final c in const [
+                  'مشروبات',
+                  'بقالة',
+                  'منظفات',
+                  'ألبان',
+                  'حلويات',
+                  'مجمدات',
+                  'خضار',
+                ])
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: TashilSpacing.sm,
+                    ),
+                    child: FilterChip(
+                      label: Text(c),
+                      selected: _row.contains(c),
+                      onSelected: (v) =>
+                          setState(() => v ? _row.add(c) : _row.remove(c)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      SpecSection(
+        title: 'شرايح الإدخال',
+        m3: 'Input chips',
+        spec: 'components/chips/guidelines#input-chips',
+        rule:
+            'جوه حقل الكتابة. Enter أو فاصلة تعمل شريحة. Backspace مرة '
+            'تحدد آخر شريحة، ومرة تانية تمسحها. زرار المسح دايماً في آخر الشريحة.',
+        children: [
+          InputChipField(
+            label: 'باركودات إضافية للصنف',
+            hint: 'اكتب الباركود واضغط Enter',
+            avatar: Icons.qr_code_2,
+            values: _barcodes,
+            onChanged: (v) => setState(() => _barcodes = v),
+          ),
+        ],
+      ),
+      SpecSection(
+        title: 'شرايح الاقتراحات',
+        m3: 'Suggestion chips',
+        spec: 'components/chips/guidelines#suggestion-chips',
+        rule:
+            'اقتراحات من النظام (عمليات بحث سابقة، رد سريع). '
+            'أسماء أو جمل قصيرة، من غير أيقونة.',
+        children: [
+          TextField(
+            controller: _search,
+            decoration: const InputDecoration(
+              labelText: 'ابحث عن صنف',
+              prefixIcon: Icon(Icons.search),
+            ),
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          Demo([
+            for (final q in const ['سكر', 'زيت عباد', 'أرز 5 كجم'])
+              ActionChip(label: Text(q), onPressed: () => _search.text = q),
           ]),
         ],
       ),

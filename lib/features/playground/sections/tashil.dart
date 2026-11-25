@@ -84,9 +84,11 @@ class _TashilSectionState extends State<TashilSection> {
         ],
       ),
       SpecSection(
-        title: 'StockBadge · SyncStatusChip',
-        spec: 'components/chips',
-        rule: 'أخضر = متوفر، برتقالي = تحت الحد الأدنى، أحمر = نفد.',
+        title: 'StockBadge · SyncStatusLabel',
+        spec: 'styles/color/roles',
+        rule:
+            'أخضر = متوفر، برتقالي = تحت الحد الأدنى، أحمر = نفد. '
+            'دي حالات للعرض بس، مش شرايح: الشريحة في M3 لازم تتداس.',
         children: const [
           Demo([
             StockBadge(quantity: 50, minStock: 10, unit: 'قطعة'),
@@ -94,11 +96,11 @@ class _TashilSectionState extends State<TashilSection> {
             StockBadge(quantity: 0, minStock: 10, unit: 'قطعة'),
             StockBadge(quantity: 1.25, minStock: 2, unit: 'كجم'),
           ]),
-          SizedBox(height: TashilSpacing.sm),
+          SizedBox(height: TashilSpacing.md),
           Demo([
-            SyncStatusChip(SyncState.synced),
-            SyncStatusChip(SyncState.pending),
-            SyncStatusChip(SyncState.failed),
+            SyncStatusLabel(SyncState.synced),
+            SyncStatusLabel(SyncState.pending),
+            SyncStatusLabel(SyncState.failed),
           ]),
         ],
       ),

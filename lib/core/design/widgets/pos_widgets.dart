@@ -28,7 +28,9 @@ class MoneyText extends StatelessWidget {
   }
 }
 
-/// Stock level chip: normal, low (<= min) or out (<= 0).
+/// Stock level label: normal, low (<= min) or out (<= 0).
+///
+/// Not a chip: M3 chips are interactive, this only shows a state.
 class StockBadge extends StatelessWidget {
   const StockBadge({
     super.key,
@@ -70,8 +72,10 @@ class StockBadge extends StatelessWidget {
 /// Sync state of a record, mirrors `SyncStatus` in the database.
 enum SyncState { synced, pending, failed }
 
-class SyncStatusChip extends StatelessWidget {
-  const SyncStatusChip(this.state, {super.key});
+/// Read-only sync state: icon + text. Not a chip, because M3 chips are
+/// interactive (m3.material.io/components/chips/guidelines).
+class SyncStatusLabel extends StatelessWidget {
+  const SyncStatusLabel(this.state, {super.key});
 
   final SyncState state;
 
@@ -92,10 +96,21 @@ class SyncStatusChip extends StatelessWidget {
       ),
       SyncState.failed => (Icons.cloud_off_outlined, 'فشلت', scheme.error),
     };
-    return Chip(
-      avatar: Icon(icon, color: color, size: 18),
-      label: Text(label),
-      visualDensity: VisualDensity.compact,
+    return Semantics(
+      label: 'المزامنة: $label',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: TashilSpacing.xs),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
     );
   }
 }

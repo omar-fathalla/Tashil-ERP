@@ -35,7 +35,7 @@ so you can check any component under each condition.
 | `lib/core/design/app_localizations.dart` | Arabic locale + Material/Cupertino/Widgets delegates |
 | `lib/core/design/money.dart` | Piastres to display text |
 | `lib/core/design/bidi.dart` | Keep invoice numbers, barcodes, dates left-to-right inside Arabic |
-| `lib/core/design/widgets/` | `ButtonGroup` (M3 Expressive) and Tashil composites: `ProductTile`, `CartLine`, `QtyStepper`, `CheckoutBar`, `NumericKeypad`, `StockBadge`, `SyncStatusChip`, `MoneyText`, `EmptyState`, `ReceiptPreview` |
+| `lib/core/design/widgets/` | `ButtonGroup` (M3 Expressive) and Tashil composites: `ProductTile`, `CartLine`, `QtyStepper`, `CheckoutBar`, `NumericKeypad`, `StockBadge`, `SyncStatusLabel`, `MoneyText`, `EmptyState`, `ReceiptPreview` |
 | `lib/features/playground/` | The playground page, one file per tab |
 
 ## Rules
@@ -87,7 +87,12 @@ so you can check any component under each condition.
 | Icon-only action | `IconButton` | Always has a `tooltip` |
 | Text input | `TextField` (outlined, from theme) | Numeric keyboard for numbers; errors under the field |
 | Product search | `SearchAnchor.bar` | Barcode scan icon in the bar |
-| Filtering lists | `FilterChip`; single choice `ChoiceChip` | |
+| Contextual action (print receipt, share) | `ActionChip` with icon (assist) | Starts with a verb; below the main content; `.elevated` only over an image |
+| Filtering lists | `FilterChip` | One set is single- or multi-select, never both. `ChoiceChip` is not an M3 variant: do not use it |
+| Filter that opens options (category ▾) | `MenuFilterChip` | The whole chip opens the menu |
+| Values the user types (extra barcodes, tags) | `InputChipField` | Enter or comma adds; Backspace selects then deletes; ✕ at the end |
+| System suggestions (recent searches) | `ActionChip` without icon (suggestion) | Nouns or short phrases |
+| Read-only state (stock, sync) | `StockBadge`, `SyncStatusLabel` | Not chips: M3 chips are always interactive |
 | Main navigation on the device | `NavigationBar` | 3 to 5 destinations |
 | Wide screens (> 600 dp) | `NavigationRail` | |
 | Secondary destinations | `NavigationDrawer` | Customers, suppliers, expenses, shift |
@@ -99,6 +104,22 @@ so you can check any component under each condition.
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
+
+### Chips
+Source: **m3.material.io/components/chips/guidelines**. Code:
+`lib/core/design/widgets/chips.dart`. Live: playground tab "المدخلات".
+
+- Four variants only: assist, filter, input, suggestion.
+- Chips always come as a set, never a single chip alone. A filter set never
+  has only one option.
+- Chips are not buttons. The step that finishes a task (checkout, save form)
+  is a button.
+- Outlined on plain backgrounds. Elevated only on images. Never use
+  elevation to show the pressed state.
+- Labels are 20 characters at most. 8 dp between chips. 48 dp touch target
+  (from `materialTapTargetSize.padded`).
+- More than two rows of chips: switch to one horizontally scrolling row.
+- The trailing icon sits at the end of the chip, so on the left in Arabic.
 
 ### Motion
 Source: **m3.material.io/styles/motion**: *Motion physics system*, *Easing
