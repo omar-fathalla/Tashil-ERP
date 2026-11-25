@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'motion.dart';
 import 'tokens.dart';
 
 /// Builds the single Material 3 theme used by the app and the playground.
@@ -73,6 +74,7 @@ abstract final class TashilTheme {
         ),
       ),
       dividerTheme: const DividerThemeData(space: 1),
+      pageTransitionsTheme: TashilTransitions.pageTransitionsTheme,
     );
   }
 

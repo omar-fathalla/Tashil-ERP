@@ -71,14 +71,17 @@ void main() {
     expect(find.text('ج'), findsNothing);
   });
 
-  test('spring tokens settle in plausible times', () {
-    expect(
-      TashilSpring.fastSpatial.duration,
-      lessThan(TashilSpring.slowSpatial.duration),
-    );
+  test('spring tokens match the official M3 conversion table', () {
+    expect(TashilSpring.fastSpatial.duration.inMilliseconds, 350);
+    expect(TashilSpring.defaultSpatial.duration.inMilliseconds, 500);
+    expect(TashilSpring.slowSpatial.duration.inMilliseconds, 650);
+    expect(TashilSpring.defaultSpatial.dampingRatio, 0.8);
+    expect(TashilSpring.defaultSpatial.stiffness, 380);
+    expect(TashilEasing.emphasized.duration.inMilliseconds, 500);
+    expect(TashilEasing.emphasizedDecelerate.duration.inMilliseconds, 400);
+    expect(TashilEasing.emphasizedAccelerate.duration.inMilliseconds, 200);
     for (final s in TashilSpring.values) {
-      expect(s.duration.inMilliseconds, inInclusiveRange(100, 2000));
-      expect(s.curve.transform(1), 1);
+      expect(s.curve.transform(1), closeTo(1, 1e-9));
     }
   });
 }

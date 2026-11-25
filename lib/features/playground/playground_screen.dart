@@ -8,6 +8,7 @@ import 'sections/foundations.dart';
 import 'sections/inputs.dart';
 import 'sections/navigation.dart';
 import 'sections/tashil.dart';
+import 'sections/transitions.dart';
 
 /// Component playground: every Material 3 component Tashil uses, rendered
 /// with the real app theme. This page is the visual reference for the design
@@ -23,6 +24,7 @@ class PlaygroundScreen extends StatefulWidget {
     (Icons.explore_outlined, 'التنقل'),
     (Icons.view_agenda_outlined, 'الحاويات'),
     (Icons.notifications_outlined, 'التنبيهات'),
+    (Icons.animation, 'الانتقالات'),
     (Icons.point_of_sale_outlined, 'مكونات تسهيل'),
   ];
 
@@ -103,6 +105,7 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
                     NavigationSection(),
                     ContainmentSection(),
                     FeedbackSection(),
+                    TransitionsSection(),
                     TashilSection(),
                   ],
                 ),

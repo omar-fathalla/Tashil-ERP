@@ -101,29 +101,60 @@ so you can check any component under each condition.
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
 
 ### Motion
-Source: **m3.material.io/styles/motion** (component pages only describe each
-component's own behaviour in their "Behavior" section).
+Source: **m3.material.io/styles/motion**: *Motion physics system*, *Easing
+and duration*, *Transitions*. Component pages only describe each component's
+own movement in their "Behavior" section. Code: `lib/core/design/motion.dart`.
+Live demos: playground tabs "الأساسيات" (springs) and "الانتقالات"
+(transitions).
 
-- Movement inside a screen uses **springs** from `TashilSpring`
-  (`lib/core/design/motion.dart`), M3 Expressive scheme. Values are the
-  official tokens (copied from Jetpack Compose's generated
-  `ExpressiveMotionTokens`, token version 41.1.19):
+**1. Inside a screen: springs (`TashilSpring`, Expressive scheme).**
+Each token carries the spring (damping, stiffness) and the official
+curve + duration from M3's "Convert springs to curves" table.
 
-  | Token | Damping | Stiffness | Use |
-  | --- | --- | --- | --- |
-  | `fastSpatial` | 0.6 | 800 | Small parts: button press, shape morph, toggle |
-  | `defaultSpatial` | 0.8 | 380 | Most movement: menus opening, cards, sheets |
-  | `slowSpatial` | 0.8 | 200 | Large or full-screen movement |
-  | `fastEffects` / `defaultEffects` / `slowEffects` | 1.0 | 3800 / 1600 / 800 | Colour and opacity (never bounce) |
-  | `standard*Spatial` | 0.9 | 1400 / 700 / 300 | Calm variant for dense data screens (reports) |
+| Token | Damping | Stiffness | Curve | Duration | Use |
+| --- | --- | --- | --- | --- | --- |
+| `fastSpatial` | 0.6 | 800 | (0.42, 1.67, 0.21, 0.90) | 350ms | Small parts: press, shape morph, toggle |
+| `defaultSpatial` | 0.8 | 380 | (0.38, 1.21, 0.22, 1.00) | 500ms | Most movement: menus, cards, sheets |
+| `slowSpatial` | 0.8 | 200 | (0.39, 1.29, 0.35, 0.98) | 650ms | Full-screen movement |
+| `fastEffects` | 1.0 | 3800 | (0.31, 0.94, 0.34, 1.00) | 150ms | Colour / opacity, small |
+| `defaultEffects` | 1.0 | 1600 | (0.34, 0.80, 0.34, 1.00) | 200ms | Colour / opacity |
+| `slowEffects` | 1.0 | 800 | (0.34, 0.88, 0.34, 1.00) | 300ms | Full-screen fades |
+| `standard*Spatial` | 0.9 | 1400 / 700 / 300 | (0.27, 1.06, 0.18, 1.00) | 350 / 500 / 750ms | Calm variant for dense data screens (reports) |
 
-- Implicit animations: `duration: spring.duration, curve: spring.curve`.
-  Explicit ones: `controller.animateWith(SpringSimulation(spring.description, ...))`.
+- Implicit animations: `duration: s.duration, curve: s.curve`.
+- Explicit animations: `controller.animateWith(SpringSimulation(s.description, from, to, velocity))`,
+  which keeps velocity when interrupted.
+- Spatial springs may overshoot; effects never do.
+
+**2. Transitions: easing + duration pairs (`TashilEasing`).**
+
+| Token | Easing | Duration | Transition |
+| --- | --- | --- | --- |
+| `emphasized` | Emphasized | 500ms | Begins and ends on screen |
+| `emphasizedDecelerate` | Emphasized decelerate | 400ms | Enters the screen |
+| `emphasizedAccelerate` | Emphasized accelerate | 200ms | Exits the screen |
+| `standard` | Standard | 300ms | Small utility transitions |
+| `standardDecelerate` | Standard decelerate | 250ms | Small enter |
+| `standardAccelerate` | Standard accelerate | 200ms | Small exit |
+
+**3. Transition patterns (Google's `animations` package).**
+
+| Pattern | Tashil example | How |
+| --- | --- | --- |
+| Container transform | Product card opens into product details | `OpenContainer`, `TashilTransitions.containerTransform` |
+| Forward and backward | Cart, then payment, then receipt | Default page transition in the theme (shared X axis, mirrored for RTL). Just `Navigator.push` |
+| Lateral | Report tabs (sales, returns, expenses) | `PageTransitionSwitcher` + `TashilTransitions.sharedX` |
+| Top level | Navigation bar destinations | `PageTransitionSwitcher` + `FadeThroughTransition` |
+| Enter and exit | Dialogs and menus inside a screen | `showModal` + `FadeScaleTransitionConfiguration` |
+| Skeleton loaders | Syncing products, loading a report | Grey shapes where content will be, then fade to content |
+
+**Rules**
 - Never hand-pick a curve or duration (`Curves.easeOutBack`, `200ms`).
-- Screen-to-screen transitions keep M3 `Durations` + `Easing`
-  (e.g. `Durations.medium4`, `Easing.emphasizedDecelerate`).
-- Wrap durations in `TashilMotion.scaled(context, d)` so the system
+- Wrap every duration in `TashilMotion.scaled(context, d)` so the system
   "remove animations" setting turns motion off.
+- Directional motion follows reading direction: forward moves right-to-left
+  in Arabic.
+- One transition pattern per kind of navigation, everywhere in the app.
 
 ### Localisation and direction
 - App locale is `ar_EG`, which makes the whole tree RTL and translates built-in
@@ -140,7 +171,7 @@ page, and replace it with Flutter's version once it lands.
 | --- | --- | --- |
 | Button groups (standard, connected), sizes XS-XL | `ButtonGroup` in `widgets/button_group.dart` | m3.material.io/components/button-groups |
 | FAB menu (2-6 actions, focus on close button, Esc closes, toggle announced with expanded state) | `FabMenu` in `widgets/fab_menu.dart` | m3.material.io/components/fab-menu |
-| Expressive motion springs | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion |
+| Expressive motion springs + curve conversions | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion/overview/specs |
 
 ## Adding a component
 1. Check it exists in M3 (m3.material.io) and in Flutter's Material library.
