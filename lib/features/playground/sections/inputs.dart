@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/chips.dart';
 import '../../../core/design/widgets/date_time_fields.dart';
+import '../../../core/design/widgets/menus.dart';
 import 'common.dart';
 
 class InputsSection extends StatefulWidget {
@@ -16,6 +17,9 @@ class _InputsSectionState extends State<InputsSection> {
   bool _check = true;
   bool _switch = true;
   String _unit = 'pcs';
+  String _pay = 'cash';
+  String? _vendor;
+  final Set<String> _columns = {'الكمية', 'سعر البيع'};
   double _slider = 20;
   final Set<String> _filters = {'قليل المخزون'};
   String _choice = 'اليوم';
@@ -107,9 +111,128 @@ class _InputsSectionState extends State<InputsSection> {
         ],
       ),
       SpecSection(
-        title: 'القائمة المنسدلة',
-        m3: 'Menus / DropdownMenu',
-        spec: 'components/menus',
+        title: 'القوائم',
+        m3: 'Menus',
+        spec: 'components/menus/guidelines',
+        rule:
+            'إجراءات مؤقتة من زرار النقط التلاتة أو ضغطة طويلة. الزرار يفضل pressed '
+            'وهي مفتوحة. المجموعات بـ gap (واحد أو اتنين). العنصر اللي مش '
+            'متاح يبان معطل مش يتشال. Vibrant للقوائم المهمة القليلة بس.',
+        children: [
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            child: ContextMenuRegion(
+              style: groupedMenuStyle,
+              menuChildren: groupedMenuChildren(context, [
+                [
+                  MenuOption(
+                    label: 'تعديل السعر',
+                    icon: Icons.sell_outlined,
+                    onPressed: () {},
+                  ),
+                  MenuOption(
+                    label: 'طباعة باركود',
+                    icon: Icons.qr_code_2,
+                    onPressed: () {},
+                  ),
+                ],
+                [
+                  MenuOption(
+                    label: 'إيقاف البيع',
+                    icon: Icons.block,
+                    onPressed: () {},
+                  ),
+                ],
+              ]),
+              child: ListTile(
+                leading: const Icon(Icons.inventory_2_outlined),
+                title: const Text('سكر أبيض 1 كجم'),
+                subtitle: const Text('اضغط ضغطة طويلة: قائمة سياق'),
+                trailing: MenuButton(
+                  icon: Icons.more_vert,
+                  tooltip: 'خيارات الصنف',
+                  style: groupedMenuStyle,
+                  menuChildren: groupedMenuChildren(context, [
+                    [
+                      MenuOption(
+                        label: 'تعديل',
+                        icon: Icons.edit_outlined,
+                        onPressed: () {},
+                      ),
+                      MenuOption(
+                        label: 'نسخ كصنف جديد',
+                        icon: Icons.copy_outlined,
+                        onPressed: () {},
+                      ),
+                      SubmenuButton(
+                        leadingIcon: const Icon(Icons.ios_share),
+                        menuChildren: [
+                          MenuItemButton(
+                            onPressed: () {},
+                            child: const Text('PDF'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () {},
+                            child: const Text('Excel'),
+                          ),
+                        ],
+                        child: const Text('تصدير'),
+                      ),
+                    ],
+                    [
+                      const MenuOption(
+                        label: 'مرتجع',
+                        icon: Icons.assignment_return_outlined,
+                        supportingText: 'مفيش مبيعات للصنف ده النهارده',
+                        onPressed: null,
+                      ),
+                      MenuOption(
+                        label: 'حذف',
+                        icon: Icons.delete_outline,
+                        onPressed: () {},
+                      ),
+                    ],
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          Demo([
+            MenuAnchor(
+              style: groupedMenuStyle,
+              menuChildren: groupedMenuChildren(context, [
+                [
+                  for (final (v, l) in const [
+                    ('cash', 'نقدي'),
+                    ('card', 'كارت'),
+                    ('wallet', 'محفظة'),
+                    ('credit', 'آجل'),
+                  ])
+                    MenuOption(
+                      label: l,
+                      style: MenuColorStyle.vibrant,
+                      selected: _pay == v,
+                      onPressed: () => setState(() => _pay = v),
+                    ),
+                ],
+              ], style: MenuColorStyle.vibrant),
+              builder: (context, c, _) => FilledButton.tonalIcon(
+                onPressed: () => c.isOpen ? c.close() : c.open(),
+                icon: const Icon(Icons.payments_outlined),
+                label: const Text('طريقة الدفع (vibrant)'),
+              ),
+            ),
+          ]),
+        ],
+      ),
+      SpecSection(
+        title: 'قائمة اختيار',
+        m3: 'Menus: select',
+        spec: 'components/menus/guidelines#selecting',
+        rule:
+            'اختيار واحد: DropdownMenu، ولو القائمة طويلة اكتب للفلترة. '
+            'اختيار متعدد: القائمة بتفضل مفتوحة لحد ما تقفلها.',
         children: [
           DropdownMenu<String>(
             initialSelection: _unit,
@@ -120,6 +243,59 @@ class _InputsSectionState extends State<InputsSection> {
               DropdownMenuEntry(value: 'kg', label: 'كيلو'),
               DropdownMenuEntry(value: 'box', label: 'كرتونة'),
             ],
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          DropdownMenu<String>(
+            label: const Text('المورد'),
+            hintText: 'اكتب للبحث',
+            enableFilter: true,
+            requestFocusOnTap: true,
+            menuHeight: 260,
+            leadingIcon: const Icon(Icons.search),
+            initialSelection: _vendor,
+            onSelected: (v) => setState(() => _vendor = v),
+            dropdownMenuEntries: [
+              for (final s in [
+                'الأهرام للتوزيع',
+                'النيل للتوريدات',
+                'الدلتا للمواد الغذائية',
+                'جهينة',
+                'دومتي',
+                'إيديتا',
+                'شيبسي',
+                'بيبسي',
+                'كوكاكولا',
+                'لبنيتا',
+                'المراعي',
+                'فرج الله',
+              ])
+                DropdownMenuEntry(value: s, label: s),
+            ],
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          MenuAnchor(
+            menuChildren: [
+              for (final c in const [
+                'الكمية',
+                'سعر الشراء',
+                'سعر البيع',
+                'الربح',
+                'الباركود',
+              ])
+                CheckboxMenuButton(
+                  value: _columns.contains(c),
+                  closeOnActivate: false,
+                  onChanged: (v) => setState(
+                    () => v == true ? _columns.add(c) : _columns.remove(c),
+                  ),
+                  child: Text(c),
+                ),
+            ],
+            builder: (context, c, _) => OutlinedButton.icon(
+              onPressed: () => c.isOpen ? c.close() : c.open(),
+              icon: const Icon(Icons.view_column_outlined),
+              label: Text('أعمدة التقرير (${_columns.length})'),
+            ),
           ),
         ],
       ),

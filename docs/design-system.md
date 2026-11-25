@@ -104,6 +104,10 @@ so you can check any component under each condition.
 | Acknowledge (printer out of paper) | `AlertDialog`, one action | Only acknowledgement dialogs have a single button |
 | Pick one item (return reason) | `showChoiceDialog` | Title and buttons pinned, list scrolls, confirm disabled until a choice |
 | Create/edit form | `FormDialog` | Full screen on compact, basic dialog from 600dp; asks before discarding edits |
+| Actions on an item (edit, copy, delete) | `MenuButton` + `groupedMenuChildren` | Trigger stays pressed while open; groups separated by gaps; unavailable items shown disabled |
+| Actions from long press / right click | `ContextMenuRegion` | Same items as the item's overflow menu |
+| Pick one value in a form (unit, supplier) | `DropdownMenu` | `enableFilter` for long lists (10+) |
+| Pick several values (report columns) | `CheckboxMenuButton` in a `MenuAnchor` | `closeOnActivate: false`: stays open until dismissed |
 | Quick options on an item | `showModalBottomSheet` (drag handle) | |
 | Confirmation with undo | `SnackBar` (floating) | Not for serious errors |
 | Persistent state (offline, shift closed) | `MaterialBanner` | |
@@ -202,6 +206,31 @@ Source: **m3.material.io/components/chips/guidelines**. Code:
 - More than two rows of chips: switch to one horizontally scrolling row.
 - The trailing icon sits at the end of the chip, so on the left in Arabic.
 
+### Menus
+Source: **m3.material.io/components/menus/guidelines**. Code:
+`lib/core/design/widgets/menus.dart`. Live: playground tab "المدخلات",
+sections "القوائم" and "قائمة اختيار".
+
+- Built only from Flutter's menu parts: `MenuAnchor`, `MenuItemButton`,
+  `SubmenuButton`, `CheckboxMenuButton`, `DropdownMenu`.
+- **Gaps:** split items into groups on separate rounded surfaces with a
+  small gap (`groupedMenuChildren` + `groupedMenuStyle`). One or two gaps
+  per menu. Scrolling menus use dividers instead of gaps.
+- **Colour styles:** `standard` (surface) for almost everything;
+  `vibrant` (tertiary) only for a few prominent menus, such as the payment
+  method.
+- **Selected item:** rounded highlight with a check (`MenuOption.selected`).
+- **Disabled, not removed:** an item that does not apply right now stays in
+  place, disabled, with supporting text saying why. Items never jump around.
+- The button that opens a menu shows a pressed state while it is open
+  (`MenuButton`). Choosing an item does not change its icon.
+- Submenus (`SubmenuButton`) for one level only.
+- Labels are short verbs; keyboard shortcuts or values go in trailing text.
+- Destructive items (حذف) go last, in their own group.
+- Long press (touch) or right click (mouse) opens a context menu at the
+  touch point (`ContextMenuRegion`).
+- A multi-select menu stays open while you tick items.
+
 ### Motion
 Source: **m3.material.io/styles/motion**: *Motion physics system*, *Easing
 and duration*, *Transitions*. Component pages only describe each component's
@@ -276,6 +305,7 @@ page, and replace it with Flutter's version once it lands.
 | Expressive motion springs + curve conversions | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion/overview/specs |
 | Loading indicator (morphing shapes, contained) | `LoadingIndicator` in `widgets/loading_indicator.dart`, built on Flutter's official `MaterialShapes` + `MaterialShapeBorder` | m3.material.io/components/loading-indicator |
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
+| Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component
 1. Check it exists in M3 (m3.material.io) and in Flutter's Material library.
