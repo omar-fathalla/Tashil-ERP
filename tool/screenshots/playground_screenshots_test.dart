@@ -56,7 +56,7 @@ void main() {
             .animateTo(i);
         await _settle(tester);
         final position = _sectionList(tester);
-        for (var page = 0; page < 6; page++) {
+        for (var page = 0; page < 10; page++) {
           await expectLater(
             find.byType(PlaygroundApp),
             matchesGoldenFile('$out/${b.name}_${i}_$page.png'),

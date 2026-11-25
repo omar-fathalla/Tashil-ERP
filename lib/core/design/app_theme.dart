@@ -74,6 +74,12 @@ abstract final class TashilTheme {
         ),
       ),
       dividerTheme: const DividerThemeData(space: 1),
+      // Cairo is wider than Roboto: at 360dp the stock headlineLarge cuts
+      // "الخميس، 26 نوفمبر". One step down keeps the whole date visible.
+      datePickerTheme: DatePickerThemeData(
+        headerHeadlineStyle: text.headlineSmall,
+        rangePickerHeaderHeadlineStyle: text.headlineSmall,
+      ),
       pageTransitionsTheme: TashilTransitions.pageTransitionsTheme,
     );
   }

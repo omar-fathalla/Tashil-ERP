@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/chips.dart';
+import '../../../core/design/widgets/date_time_fields.dart';
 import 'common.dart';
 
 class InputsSection extends StatefulWidget {
@@ -31,7 +32,11 @@ class _InputsSectionState extends State<InputsSection> {
     super.dispose();
   }
 
-  DateTime? _date;
+  DateTime? _invoiceDate = DateTime(2026, 11, 26);
+  DateTime? _expiry;
+  DateTimeRange? _range;
+  TimeOfDay _shiftClose = const TimeOfDay(hour: 23, minute: 0);
+  bool _time24 = false;
 
   static const _products = [
     'سكر أبيض 1 كجم',
@@ -43,6 +48,7 @@ class _InputsSectionState extends State<InputsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = MaterialLocalizations.of(context);
     return SectionList([
       SpecSection(
         title: 'حقول النص',
@@ -384,44 +390,101 @@ class _InputsSectionState extends State<InputsSection> {
         ],
       ),
       SpecSection(
-        title: 'التاريخ والوقت',
-        m3: 'Date & time pickers',
-        spec: 'components/date-pickers',
-        rule: 'للتقارير والفلترة. التقويم بيطلع بالعربي من locale.',
+        title: 'التاريخ',
+        m3: 'Date pickers',
+        spec: 'components/date-pickers/guidelines',
+        rule:
+            'في الفورم: حقل تاريخ يتكتب بالكيبورد وجنبه زرار تقويم. على '
+            'SUNMI (شاشة compact) التقويم بيفتح modal، ومن 600dp بيفتح تحت '
+            'الحقل (docked). للتواريخ البعيدة زي الصلاحية الكتابة أسرع، '
+            'والحقل بيقبل 15/4/2027 وبيقبل الأرقام العربية.',
+        children: [
+          DateField(
+            label: 'تاريخ الفاتورة',
+            value: _invoiceDate,
+            firstDate: DateTime(2024),
+            lastDate: DateTime(2030, 12, 31),
+            onChanged: (d) => setState(() => _invoiceDate = d),
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          DateField(
+            label: 'تاريخ الصلاحية (docked)',
+            value: _expiry,
+            docked: true,
+            firstDate: DateTime(2024),
+            lastDate: DateTime(2035, 12, 31),
+            onChanged: (d) => setState(() => _expiry = d),
+          ),
+        ],
+      ),
+      SpecSection(
+        title: 'فترة تاريخ',
+        m3: 'Date range picker',
+        spec: 'components/date-pickers/guidelines',
+        rule:
+            'للتقارير: الفترات الجاهزة (اليوم، الأسبوع، الشهر) ButtonGroup، '
+            'و"فترة مخصصة" بتفتح منتقي الفترة بملء الشاشة على الموبايل.',
         children: [
           Demo([
             OutlinedButton.icon(
-              icon: const Icon(Icons.event),
+              icon: const Icon(Icons.date_range),
               label: Text(
-                _date == null
-                    ? 'اختر تاريخ'
-                    : '${_date!.year}-${_date!.month}-${_date!.day}',
+                _range == null
+                    ? 'فترة مخصصة'
+                    : '${loc.formatShortMonthDay(_range!.start)} – '
+                          '${loc.formatShortMonthDay(_range!.end)}',
               ),
               onPressed: () async {
-                final d = await showDatePicker(
+                final r = await showDateRangePicker(
                   context: context,
                   firstDate: DateTime(2024),
-                  lastDate: DateTime(2030),
-                  initialDate: _date ?? DateTime.now(),
+                  lastDate: DateTime(2030, 12, 31),
+                  initialDateRange: _range,
+                  initialEntryMode: DatePickerEntryMode.calendarOnly,
                 );
-                if (d != null) setState(() => _date = d);
+                if (r != null) setState(() => _range = r);
               },
             ),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.date_range),
-              label: const Text('فترة'),
-              onPressed: () => showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2024),
-                lastDate: DateTime(2030),
-              ),
-            ),
+          ]),
+        ],
+      ),
+      SpecSection(
+        title: 'الوقت',
+        m3: 'Time pickers',
+        spec: 'components/time-pickers/guidelines',
+        rule:
+            'Scroll جوه الفورم (يفضل inline). الـ Dial في dialog بس. زرار '
+            'الكيبورد لازم يبقى موجود. 12 أو 24 ساعة حسب إعداد الجهاز. لو '
+            'الأوقات محددة (كل ربع ساعة) استخدم ButtonGroup أو قائمة.',
+        children: [
+          Text(
+            'موعد قفل الوردية: ${_shiftClose.format(context)}',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          ScrollTimePicker(
+            value: _shiftClose,
+            use24HourFormat: _time24,
+            onChanged: (t) => setState(() => _shiftClose = t),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _time24,
+            onChanged: (v) => setState(() => _time24 = v),
+            title: const Text('نظام 24 ساعة'),
+          ),
+          Demo([
             OutlinedButton.icon(
               icon: const Icon(Icons.schedule),
-              label: const Text('وقت'),
+              label: const Text('الساعة (Dial)'),
               onPressed: () => showTimePicker(
                 context: context,
-                initialTime: TimeOfDay.now(),
+                initialTime: _shiftClose,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(alwaysUse24HourFormat: _time24),
+                  child: child!,
+                ),
               ),
             ),
           ]),

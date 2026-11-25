@@ -93,6 +93,10 @@ so you can check any component under each condition.
 | Values the user types (extra barcodes, tags) | `InputChipField` | Enter or comma adds; Backspace selects then deletes; ✕ at the end |
 | System suggestions (recent searches) | `ActionChip` without icon (suggestion) | Nouns or short phrases |
 | Read-only state (stock, sync) | `StockBadge`, `SyncStatusLabel` | Not chips: M3 chips are always interactive |
+| Date in a form | `DateField` | Typed in the field (day/month/year, Arabic digits accepted) + calendar button: modal on compact, docked from 600dp |
+| Report period | `ButtonGroup` presets + `showDateRangePicker` (calendar only) for a custom range | Full screen on compact |
+| Time in a form | `ScrollTimePicker` inline | Keyboard toggle always present; 12/24h from the device |
+| Time in a dialog | `showTimePicker` (dial) | Dial only in dialogs. Preset times use `ButtonGroup` or a menu |
 | Main navigation on the device | `NavigationBar` | 3 to 5 destinations |
 | Wide screens (> 600 dp) | `NavigationRail` | |
 | Secondary destinations | `NavigationDrawer` | Customers, suppliers, expenses, shift |
@@ -104,6 +108,24 @@ so you can check any component under each condition.
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
+
+### Dates and times
+Sources: **m3.material.io/components/date-pickers/guidelines** and
+**/time-pickers/guidelines**. Code: `lib/core/design/widgets/date_time_fields.dart`,
+`lib/core/design/app_localizations.dart`.
+
+- Digits are Western everywhere, including Google's own pickers:
+  `TashilLocale.delegates` loads the official Arabic translations with
+  Latin-digit formatters (`WesternDigitsMaterialLocalizations`).
+- The official dialogs' keyboard mode expects hidden right-to-left marks in
+  Arabic and rejects `15/4/2027`, so dialogs open in
+  `DatePickerEntryMode.calendarOnly` and typing happens in `DateField`
+  (`parseTypedDate`).
+- Prefer inline pickers (`DateField`, `ScrollTimePicker`) so the form stays
+  visible. Dial time picker only inside a dialog.
+- Only use a time picker when any minute can be chosen.
+- `ScrollTimePicker` is M3 Expressive and not in Flutter yet: ours, built
+  on `ListWheelScrollView`, to be replaced when Flutter ships it.
 
 ### Chips
 Source: **m3.material.io/components/chips/guidelines**. Code:
