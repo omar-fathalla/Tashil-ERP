@@ -1,0 +1,544 @@
+// Tashil ERP - multi-tenant logical data model
+// Import into https://dbdiagram.io (Import > DBML) to get the full ER diagram.
+//
+// Conventions
+// - Every business table carries company_id (the tenant key). In Firestore this is
+//   the path prefix /companies/{company_id}/..., in Drift it is a column.
+// - Primary keys of business rows are UUIDv7 strings generated on the device
+//   (= Drift localUuid = Firestore document id), so sync is idempotent.
+// - Money is integer piasters (bigint). Quantities are decimal.
+// - Rows are never hard-deleted: status = cancelled / is_active = false, plus a
+//   reversing movement where stock or balances are involved.
+// - Sync columns on every business table: created_at, updated_at (server time in
+//   cloud), created_by (member uid), device_id, version.
+
+Project tashil_erp {
+  database_type: 'Firestore (logical model, PostgreSQL-flavoured DBML)'
+  Note: 'One logical database per company (tenant). 11 modules share it. See docs/database/multi-tenant-plan.md'
+}
+
+//////////////////////////////////////////////////////////////
+// PLATFORM (owned by Tashil, outside any tenant)
+//////////////////////////////////////////////////////////////
+
+TableGroup platform {
+  modules
+  plans
+  platform_admins
+  users
+}
+
+Table modules {
+  id varchar [pk, note: 'core, products, inventory, receiving, pos, reports, parties, sync_admin, cash_shifts, credit, expenses, eta']
+  name_ar varchar [not null]
+  name_en varchar [not null]
+  depends_on "varchar[]" [note: 'e.g. pos -> products, inventory']
+  is_core boolean [not null, default: false, note: 'core is always enabled']
+}
+
+Table plans {
+  id varchar [pk]
+  name varchar [not null]
+  included_modules "varchar[]" [not null]
+  max_branches int
+  max_devices int
+  max_users int
+}
+
+Table platform_admins {
+  uid varchar [pk, note: 'Firebase Auth uid']
+  role varchar [not null, note: 'super_admin | support | billing']
+  created_at timestamp [not null]
+}
+
+Table users {
+  uid varchar [pk, note: 'Firebase Auth uid (global, one person can work for several companies)']
+  display_name varchar
+  phone varchar
+  email varchar
+  default_company_id varchar [ref: > companies.id]
+  created_at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// CORE (per tenant)
+//////////////////////////////////////////////////////////////
+
+TableGroup core {
+  companies
+  company_modules
+  branches
+  roles
+  members
+  devices
+  audit_logs
+  counters
+}
+
+Table companies {
+  id varchar [pk, note: 'tenant id, short slug or ULID']
+  legal_name varchar [not null]
+  trade_name varchar
+  tax_registration_no varchar [note: 'RIN, used by ETA']
+  commercial_register_no varchar
+  plan_id varchar [ref: > plans.id]
+  status varchar [not null, note: 'active | suspended | closed']
+  currency char(3) [not null, default: 'EGP']
+  timezone varchar [not null, default: 'Africa/Cairo']
+  created_by varchar [note: 'platform admin uid']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table company_modules {
+  company_id varchar [ref: > companies.id]
+  module_id varchar [ref: > modules.id]
+  enabled boolean [not null, default: true]
+  enabled_at timestamp
+  expires_at timestamp [note: 'for trials / paid add-ons']
+  settings json [note: 'module-specific settings']
+  indexes {
+    (company_id, module_id) [pk]
+  }
+}
+
+Table branches {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  code varchar [not null, note: 'used in invoice numbers']
+  address varchar
+  eta_branch_id varchar [note: 'ETA issuer branch id']
+  is_active boolean [not null, default: true]
+  created_at timestamp
+  updated_at timestamp
+  indexes {
+    (company_id, code) [unique]
+  }
+}
+
+Table roles {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null, note: 'owner, manager, cashier, storekeeper, accountant or custom']
+  is_system boolean [not null, default: false]
+  permissions "varchar[]" [not null, note: 'module.action strings, e.g. pos.sell, pos.refund, inventory.adjust, reports.view_profit']
+  updated_at timestamp
+}
+
+Table members {
+  company_id varchar [ref: > companies.id]
+  uid varchar [ref: > users.uid]
+  role_id varchar [not null, ref: > roles.id]
+  branch_ids "varchar[]" [note: 'empty = all branches']
+  module_ids "varchar[]" [note: 'optional extra restriction inside the company modules']
+  pin_hash varchar [note: 'argon2/bcrypt hash for fast cashier switch on the POS (offline)']
+  status varchar [not null, note: 'invited | active | disabled']
+  invited_by varchar
+  created_at timestamp
+  updated_at timestamp
+  indexes {
+    (company_id, uid) [pk]
+  }
+}
+
+Table devices {
+  id varchar [pk, note: 'POS terminal id, also Firebase Auth uid device_<id> for device login']
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  label varchar
+  serial_no varchar [note: 'SUNMI serial']
+  invoice_prefix varchar [not null, note: 'unique per company, used in DEVICE-yyyyMMdd-NNNN']
+  status varchar [not null, note: 'pending | active | revoked']
+  last_seen_at timestamp
+  last_pulled_at timestamp [note: 'sync cursor for pull']
+  app_version varchar
+  indexes {
+    (company_id, invoice_prefix) [unique]
+  }
+}
+
+Table counters {
+  company_id varchar [ref: > companies.id]
+  key varchar [note: 'e.g. eta_doc_seq, purchase_seq']
+  value bigint [not null]
+  indexes {
+    (company_id, key) [pk]
+  }
+}
+
+Table audit_logs {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  actor_uid varchar
+  device_id varchar [ref: > devices.id]
+  action varchar [not null, note: 'sale.cancel, price.change, role.update ...']
+  entity_type varchar
+  entity_id varchar
+  before json
+  after json
+  at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// PRODUCTS
+//////////////////////////////////////////////////////////////
+
+TableGroup products_module {
+  categories
+  units
+  products
+  product_barcodes
+}
+
+Table categories {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  parent_id varchar [ref: > categories.id]
+  name varchar [not null]
+  is_active boolean [default: true]
+  updated_at timestamp
+}
+
+Table units {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null, note: 'pcs, kg, box ...']
+  allows_fraction boolean [default: false]
+}
+
+Table products {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  category_id varchar [ref: > categories.id]
+  unit_id varchar [ref: > units.id]
+  sku varchar
+  name varchar [not null]
+  name_ar varchar
+  cost_price bigint [not null, default: 0, note: 'piasters, last/avg cost']
+  selling_price bigint [not null, default: 0, note: 'piasters']
+  vat_rate_bp int [default: 1400, note: 'basis points, 1400 = 14%']
+  eta_item_code varchar [note: 'GS1/EGS code for e-invoice']
+  min_stock decimal
+  track_stock boolean [default: true]
+  is_active boolean [default: true]
+  created_at timestamp
+  updated_at timestamp
+  indexes {
+    (company_id, sku) [unique]
+  }
+}
+
+Table product_barcodes {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  product_id varchar [not null, ref: > products.id]
+  barcode varchar [not null]
+  pack_qty decimal [default: 1, note: 'barcode of a box of 12 = 12']
+  indexes {
+    (company_id, barcode) [unique]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// INVENTORY
+//////////////////////////////////////////////////////////////
+
+TableGroup inventory_module {
+  stock_levels
+  stock_movements
+}
+
+Table stock_levels {
+  company_id varchar [ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  product_id varchar [ref: > products.id]
+  quantity decimal [not null, note: 'derived in cloud by a Cloud Function from stock_movements']
+  updated_at timestamp
+  indexes {
+    (company_id, branch_id, product_id) [pk]
+  }
+}
+
+Table stock_movements {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  product_id varchar [not null, ref: > products.id]
+  type varchar [not null, note: 'IN | OUT | ADJUST']
+  quantity decimal [not null, note: 'signed']
+  unit_cost bigint
+  reference_type varchar [not null, note: 'SALE | PURCHASE | ADJUST | RETURN | TRANSFER']
+  reference_id varchar
+  device_id varchar [ref: > devices.id]
+  created_by varchar
+  created_at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// CUSTOMERS & SUPPLIERS
+//////////////////////////////////////////////////////////////
+
+TableGroup parties_module {
+  customers
+  suppliers
+}
+
+Table customers {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  phone varchar
+  tax_id varchar [note: 'needed for B2B e-invoice']
+  national_id varchar
+  credit_limit bigint [default: 0]
+  balance bigint [default: 0, note: 'derived from account_entries']
+  is_active boolean [default: true]
+  updated_at timestamp
+}
+
+Table suppliers {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  phone varchar
+  tax_id varchar
+  balance bigint [default: 0, note: 'derived from account_entries']
+  is_active boolean [default: true]
+  updated_at timestamp
+}
+
+//////////////////////////////////////////////////////////////
+// RECEIVING (goods receipts / purchases)
+//////////////////////////////////////////////////////////////
+
+TableGroup receiving_module {
+  purchases
+  purchase_items
+}
+
+Table purchases {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  supplier_id varchar [ref: > suppliers.id]
+  reference_no varchar
+  date timestamp [not null]
+  total bigint [not null]
+  paid bigint [default: 0]
+  status varchar [not null, note: 'completed | cancelled']
+  device_id varchar [ref: > devices.id]
+  created_by varchar
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table purchase_items {
+  id varchar [pk, note: 'embedded array inside the purchase document in Firestore']
+  purchase_id varchar [not null, ref: > purchases.id]
+  product_id varchar [not null, ref: > products.id]
+  product_name varchar [not null, note: 'snapshot']
+  quantity decimal [not null]
+  unit_cost bigint [not null]
+  total bigint [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// POS
+//////////////////////////////////////////////////////////////
+
+TableGroup pos_module {
+  sales
+  sale_items
+  sale_payments
+}
+
+Table sales {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  device_id varchar [not null, ref: > devices.id]
+  shift_id varchar [ref: > shifts.id]
+  customer_id varchar [ref: > customers.id]
+  invoice_no varchar [not null, note: 'DEVICE-yyyyMMdd-NNNN, unique per company']
+  date timestamp [not null]
+  sub_total bigint [not null]
+  discount bigint [default: 0]
+  tax bigint [default: 0]
+  total bigint [not null]
+  status varchar [not null, note: 'completed | cancelled | returned']
+  return_of_sale_id varchar [ref: > sales.id]
+  cashier_uid varchar
+  created_at timestamp
+  updated_at timestamp
+  indexes {
+    (company_id, invoice_no) [unique]
+    (company_id, branch_id, date)
+  }
+}
+
+Table sale_items {
+  id varchar [pk, note: 'embedded array inside the sale document in Firestore']
+  sale_id varchar [not null, ref: > sales.id]
+  product_id varchar [not null, ref: > products.id]
+  product_name varchar [not null, note: 'snapshot']
+  barcode varchar
+  quantity decimal [not null]
+  unit_price bigint [not null]
+  cost_price bigint [not null, note: 'snapshot for profit reports']
+  discount bigint [default: 0]
+  vat_rate_bp int
+  total bigint [not null]
+}
+
+Table sale_payments {
+  id varchar [pk, note: 'embedded array inside the sale document in Firestore']
+  sale_id varchar [not null, ref: > sales.id]
+  method varchar [not null, note: 'cash | card | wallet | credit']
+  amount bigint [not null]
+  reference varchar
+}
+
+//////////////////////////////////////////////////////////////
+// CASH DRAWER & SHIFTS
+//////////////////////////////////////////////////////////////
+
+TableGroup cash_shifts_module {
+  shifts
+  cash_movements
+}
+
+Table shifts {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  device_id varchar [not null, ref: > devices.id]
+  cashier_uid varchar [not null]
+  opened_at timestamp [not null]
+  closed_at timestamp
+  opening_cash bigint [not null]
+  expected_cash bigint [note: 'computed at close']
+  counted_cash bigint
+  difference bigint
+  status varchar [not null, note: 'open | closed']
+}
+
+Table cash_movements {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  shift_id varchar [not null, ref: > shifts.id]
+  type varchar [not null, note: 'cash_in | cash_out | sale | refund | expense']
+  amount bigint [not null]
+  reason varchar
+  reference_id varchar
+  created_by varchar
+  created_at timestamp
+}
+
+//////////////////////////////////////////////////////////////
+// CREDIT ACCOUNTS (customer & supplier ledgers)
+//////////////////////////////////////////////////////////////
+
+TableGroup credit_module {
+  account_entries
+}
+
+Table account_entries {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  party_type varchar [not null, note: 'customer | supplier']
+  party_id varchar [not null, note: 'customers.id or suppliers.id']
+  debit bigint [default: 0]
+  credit bigint [default: 0]
+  reference_type varchar [note: 'SALE | PURCHASE | PAYMENT | RETURN | OPENING']
+  reference_id varchar
+  note varchar
+  created_by varchar
+  created_at timestamp
+}
+
+//////////////////////////////////////////////////////////////
+// EXPENSES
+//////////////////////////////////////////////////////////////
+
+TableGroup expenses_module {
+  expense_categories
+  expenses
+}
+
+Table expense_categories {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+}
+
+Table expenses {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  category_id varchar [ref: > expense_categories.id]
+  shift_id varchar [ref: > shifts.id, note: 'when paid from the drawer']
+  amount bigint [not null]
+  date timestamp [not null]
+  note varchar
+  attachment_path varchar [note: 'Cloud Storage path']
+  status varchar [not null, note: 'active | cancelled']
+  created_by varchar
+  created_at timestamp
+}
+
+//////////////////////////////////////////////////////////////
+// ETA E-INVOICE / E-RECEIPT
+//////////////////////////////////////////////////////////////
+
+TableGroup eta_module {
+  eta_settings
+  eta_documents
+}
+
+Table eta_settings {
+  company_id varchar [pk, ref: - companies.id]
+  environment varchar [note: 'preprod | prod']
+  taxpayer_rin varchar
+  activity_code varchar
+  client_secret_ref varchar [note: 'Secret Manager resource name ONLY, never the secret itself']
+  pos_serials json [note: 'registered POS serials for e-receipt']
+}
+
+Table eta_documents {
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  sale_id varchar [ref: > sales.id]
+  doc_type varchar [not null, note: 'receipt | invoice | credit_note']
+  internal_id varchar [not null]
+  eta_uuid varchar
+  submission_id varchar
+  status varchar [not null, note: 'queued | submitted | valid | invalid | cancelled']
+  errors json
+  submitted_at timestamp
+  updated_at timestamp
+}
+
+//////////////////////////////////////////////////////////////
+// REPORTS (derived, written only by Cloud Functions)
+//////////////////////////////////////////////////////////////
+
+TableGroup reports_module {
+  daily_summaries
+}
+
+Table daily_summaries {
+  company_id varchar [ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  day date
+  sales_count int
+  sales_total bigint
+  cost_total bigint
+  gross_profit bigint
+  expenses_total bigint
+  returns_total bigint
+  by_payment json
+  indexes {
+    (company_id, branch_id, day) [pk]
+  }
+}

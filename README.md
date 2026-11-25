@@ -39,3 +39,7 @@ flutter run
 
 ## الأمان
 الريبو عام. ممنوع رفع `google-services.json` أو مفاتيح service account أو keystore — موجودين في `.gitignore`، وأسرار CI تتحط في GitHub Secrets.
+
+## Docs
+
+- [Multi-tenant database plan](docs/database/multi-tenant-plan.md) · [ER diagram (DBML)](docs/database/tashil-erp.dbml)
