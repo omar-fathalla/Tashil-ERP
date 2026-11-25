@@ -10,6 +10,7 @@ playground** shows every rule live, with the real theme, light and dark, RTL.
 | How | Command / action |
 | --- | --- |
 | Standalone (no database) | `flutter run -t lib/main_playground.dart` |
+| In a browser | `flutter run -d chrome -t lib/main_playground.dart`, or the GitHub Pages site once Pages is enabled (Settings > Pages > Source: GitHub Actions); it redeploys on every push to `main` |
 | Inside the app (debug builds only) | Home screen, widgets icon in the app bar |
 | Screenshots of every tab, light + dark, at SUNMI V3 size | `flutter test tool/screenshots --update-goldens` (PNGs land in `build/playground_shots/`) |
 
