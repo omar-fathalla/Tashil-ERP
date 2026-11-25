@@ -55,17 +55,46 @@ void main() {
         DefaultTabController.of(tester.element(find.byType(TabBarView).first))
             .animateTo(i);
         await _settle(tester);
-        for (var page = 0; page < 3; page++) {
+        final position = _sectionList(tester);
+        for (var page = 0; page < 6; page++) {
           await expectLater(
             find.byType(PlaygroundApp),
             matchesGoldenFile('$out/${b.name}_${i}_$page.png'),
           );
-          await tester.dragFrom(const Offset(180, 600), const Offset(0, -560));
+          if (position.extentAfter == 0) break;
+          position.jumpTo(
+            (position.pixels + 560).clamp(0, position.maxScrollExtent),
+          );
           await _settle(tester);
         }
-        await tester.dragFrom(const Offset(180, 300), const Offset(0, 5000));
+        position.jumpTo(0);
         await _settle(tester);
       }
     });
   }
+}
+
+/// Scroll position of the section list in the tab that is on screen.
+ScrollPosition _sectionList(WidgetTester tester) {
+  final list = find
+      .descendant(
+        of: find.byType(TabBarView).first,
+        matching: find.byType(ListView),
+      )
+      .evaluate()
+      .firstWhere(
+        (e) =>
+            (e.renderObject! as RenderBox).localToGlobal(Offset.zero).dx.abs() <
+            1,
+      );
+  return tester
+      .state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byElementPredicate((e) => e == list),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      )
+      .position;
 }

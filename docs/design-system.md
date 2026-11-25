@@ -35,7 +35,7 @@ so you can check any component under each condition.
 | `lib/core/design/app_localizations.dart` | Arabic locale + Material/Cupertino/Widgets delegates |
 | `lib/core/design/money.dart` | Piastres to display text |
 | `lib/core/design/bidi.dart` | Keep invoice numbers, barcodes, dates left-to-right inside Arabic |
-| `lib/core/design/widgets/` | Tashil composites: `ProductTile`, `CartLine`, `QtyStepper`, `CheckoutBar`, `NumericKeypad`, `StockBadge`, `SyncStatusChip`, `MoneyText`, `EmptyState`, `ReceiptPreview` |
+| `lib/core/design/widgets/` | `ButtonGroup` (M3 Expressive) and Tashil composites: `ProductTile`, `CartLine`, `QtyStepper`, `CheckoutBar`, `NumericKeypad`, `StockBadge`, `SyncStatusChip`, `MoneyText`, `EmptyState`, `ReceiptPreview` |
 | `lib/features/playground/` | The playground page, one file per tab |
 
 ## Rules
@@ -80,7 +80,8 @@ so you can check any component under each condition.
 | Secondary action | `FilledButton.tonal` / `OutlinedButton` | |
 | Cancel / low emphasis | `TextButton` | |
 | Most important action (scan, add) | `FloatingActionButton` | |
-| 2-5 exclusive options (payment method) | `SegmentedButton` | |
+| 2-5 exclusive options (payment method, report period) | `ButtonGroup` connected | Replaces `SegmentedButton`, which M3 no longer recommends. Do not use `SegmentedButton` |
+| Related actions or toggles in one row | `ButtonGroup` standard | Pressed button widens, corners morph |
 | Icon-only action | `IconButton` | Always has a `tooltip` |
 | Text input | `TextField` (outlined, from theme) | Numeric keyboard for numbers; errors under the field |
 | Product search | `SearchAnchor.bar` | Barcode scan icon in the bar |
@@ -101,6 +102,16 @@ so you can check any component under each condition.
 - App locale is `ar_EG`, which makes the whole tree RTL and translates built-in
   widgets (date picker, time picker, text selection).
 - Strings are Arabic in the UI. Code, identifiers and comments stay English.
+
+## M3 Expressive components Flutter does not ship yet
+M3 Expressive (May 2025) added components that only Jetpack Compose and
+MDC-Android implement so far. Where we need one, we build it in
+`lib/core/design/widgets/` from plain Material widgets, following the spec
+page, and replace it with Flutter's version once it lands.
+
+| Component | Ours | Spec |
+| --- | --- | --- |
+| Button groups (standard, connected), sizes XS-XL | `ButtonGroup` in `widgets/button_group.dart` | m3.material.io/components/button-groups |
 
 ## Adding a component
 1. Check it exists in M3 (m3.material.io) and in Flutter's Material library.

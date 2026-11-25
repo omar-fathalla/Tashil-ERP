@@ -62,9 +62,12 @@ void main() {
                   .first,
             )
             .position;
-        for (var s = 0; s < 40 && position.extentAfter > 0; s++) {
-          await tester.dragFrom(const Offset(180, 600), const Offset(0, -400));
-          await _settle(tester);
+        // Jump rather than drag: nested demo lists would swallow drags.
+        for (var s = 0; s < 60 && position.extentAfter > 0; s++) {
+          position.jumpTo(
+            (position.pixels + 400).clamp(0, position.maxScrollExtent),
+          );
+          await tester.pump(const Duration(milliseconds: 100));
         }
         expect(position.extentAfter, 0, reason: 'tab $i fully scrolled');
         await _settle(tester);

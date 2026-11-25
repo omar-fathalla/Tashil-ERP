@@ -1,5 +1,8 @@
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/design/tokens.dart';
+import '../../../core/design/widgets/button_group.dart';
 import 'common.dart';
 
 enum _Pay { cash, card, credit }
@@ -14,6 +17,9 @@ class ActionsSection extends StatefulWidget {
 class _ActionsSectionState extends State<ActionsSection> {
   Set<_Pay> _pay = {_Pay.cash};
   bool _fav = false;
+  Set<String> _toggles = {'print', 'scan'};
+  Set<String> _range = {'day'};
+  Set<int> _qty = {1};
 
   @override
   Widget build(BuildContext context) {
@@ -117,35 +123,222 @@ class _ActionsSectionState extends State<ActionsSection> {
           ]),
         ],
       ),
+      const SpecSection(
+        title: 'الزر العائم الممتد',
+        m3: 'Extended FAB',
+        spec: 'components/extended-fab/guidelines',
+        rule:
+            'للإجراء الأساسي لما الأيقونة لوحدها مش كفاية (صنف جديد، فاتورة '
+            'جديدة). بيتقفل لأيقونة بس لما تنزل في القائمة ويرجع يفتح لما '
+            'تطلع. مكانه تحت على الطرف (يسار في العربي) فوق شريط التنقل.',
+        children: [_ExtendedFabDemo()],
+      ),
       SpecSection(
-        title: 'الأزرار المقسّمة',
-        m3: 'Segmented button',
-        spec: 'components/segmented-buttons',
-        rule: 'لاختيار من 2 لـ 5 بدائل، زي طريقة الدفع.',
+        title: 'مجموعات الأزرار',
+        m3: 'Button groups (standard)',
+        spec: 'components/button-groups',
+        rule:
+            'أزرار مرتبطة ببعض في صف واحد، زي أدوات الصنف أو اختيارات '
+            'متعددة. الزرار اللي بتدوس عليه بيعرض وشكله بيتغير.',
         children: [
-          SegmentedButton<_Pay>(
-            segments: const [
-              ButtonSegment(
-                value: _Pay.cash,
-                label: Text('كاش'),
-                icon: Icon(Icons.payments_outlined),
+          ButtonGroup<String>(
+            size: ButtonGroupSize.m,
+            multiSelect: true,
+            selectionRequired: false,
+            selected: _toggles,
+            onSelectionChanged: (v) => setState(() => _toggles = v),
+            items: const [
+              ButtonGroupItem(
+                value: 'print',
+                icon: Icons.print_outlined,
+                tooltip: 'طباعة تلقائية',
               ),
-              ButtonSegment(
-                value: _Pay.card,
-                label: Text('فيزا'),
-                icon: Icon(Icons.credit_card),
+              ButtonGroupItem(
+                value: 'sound',
+                icon: Icons.volume_up_outlined,
+                tooltip: 'صوت المسح',
               ),
-              ButtonSegment(
-                value: _Pay.credit,
-                label: Text('آجل'),
-                icon: Icon(Icons.schedule),
+              ButtonGroupItem(
+                value: 'scan',
+                icon: Icons.qr_code_scanner,
+                label: 'مسح',
+              ),
+              ButtonGroupItem(
+                value: 'flash',
+                icon: Icons.flashlight_on_outlined,
+                tooltip: 'فلاش الكاميرا',
               ),
             ],
-            selected: _pay,
-            onSelectionChanged: (v) => setState(() => _pay = v),
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          ButtonGroup<String>(
+            size: ButtonGroupSize.s,
+            onPressed: (_) {},
+            items: const [
+              ButtonGroupItem(
+                value: 'edit',
+                icon: Icons.edit_outlined,
+                tooltip: 'تعديل',
+              ),
+              ButtonGroupItem(
+                value: 'dup',
+                icon: Icons.copy_outlined,
+                label: 'تكرار',
+              ),
+              ButtonGroupItem(
+                value: 'del',
+                icon: Icons.delete_outline,
+                tooltip: 'حذف',
+              ),
+            ],
           ),
         ],
       ),
+      SpecSection(
+        title: 'مجموعة أزرار متصلة',
+        m3: 'Button groups (connected)',
+        spec: 'components/button-groups',
+        rule:
+            'لاختيار من 2 لـ 5 بدائل، زي طريقة الدفع أو فترة التقرير. '
+            'دي بديل Segmented button، وممنوع نستخدم SegmentedButton.',
+        children: [
+          ButtonGroup<_Pay>(
+            variant: ButtonGroupVariant.connected,
+            size: ButtonGroupSize.m,
+            expand: true,
+            selected: _pay,
+            onSelectionChanged: (v) => setState(() => _pay = v),
+            items: const [
+              ButtonGroupItem(
+                value: _Pay.cash,
+                label: 'كاش',
+                icon: Icons.payments_outlined,
+              ),
+              ButtonGroupItem(
+                value: _Pay.card,
+                label: 'فيزا',
+                icon: Icons.credit_card,
+              ),
+              ButtonGroupItem(
+                value: _Pay.credit,
+                label: 'آجل',
+                icon: Icons.schedule,
+              ),
+            ],
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          ButtonGroup<String>(
+            variant: ButtonGroupVariant.connected,
+            size: ButtonGroupSize.s,
+            expand: true,
+            selected: _range,
+            onSelectionChanged: (v) => setState(() => _range = v),
+            items: const [
+              ButtonGroupItem(value: 'day', label: 'اليوم'),
+              ButtonGroupItem(value: 'week', label: 'الأسبوع'),
+              ButtonGroupItem(value: 'month', label: 'الشهر'),
+              ButtonGroupItem(value: 'year', label: 'السنة'),
+            ],
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          Text(
+            'الأحجام: XS · S · M',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          for (final size in const [
+            ButtonGroupSize.xs,
+            ButtonGroupSize.s,
+            ButtonGroupSize.m,
+          ]) ...[
+            ButtonGroup<int>(
+              variant: ButtonGroupVariant.connected,
+              size: size,
+              selected: _qty,
+              onSelectionChanged: (v) => setState(() => _qty = v),
+              items: const [
+                ButtonGroupItem(value: 1, label: '1'),
+                ButtonGroupItem(value: 5, label: '5'),
+                ButtonGroupItem(value: 10, label: '10'),
+                ButtonGroupItem(value: 12, label: '12'),
+              ],
+            ),
+            const SizedBox(height: TashilSpacing.sm),
+          ],
+        ],
+      ),
     ]);
+  }
+}
+
+/// Extended FAB that collapses to an icon-only FAB while the list scrolls
+/// down and expands again when it scrolls up (M3 extended FAB guidelines).
+class _ExtendedFabDemo extends StatefulWidget {
+  const _ExtendedFabDemo();
+
+  @override
+  State<_ExtendedFabDemo> createState() => _ExtendedFabDemoState();
+}
+
+class _ExtendedFabDemoState extends State<_ExtendedFabDemo> {
+  bool _extended = true;
+
+  static const _items = [
+    'سكر أبيض 1 كجم',
+    'زيت عباد الشمس',
+    'أرز مصري 5 كجم',
+    'شاي ليبتون 100 فتلة',
+    'مكرونة 400 جم',
+    'جبنة دومتي 500 جم',
+    'لبن جهينة 1 لتر',
+    'عدس أصفر 1 كجم',
+    'صلصة طماطم',
+    'بسكويت شاي',
+    'مياه معدنية 1.5 لتر',
+    'تونة قطع',
+  ];
+
+  bool _onScroll(UserScrollNotification n) {
+    final extend = switch (n.direction) {
+      ScrollDirection.reverse => false, // scrolling down the list
+      ScrollDirection.forward => true,
+      ScrollDirection.idle => n.metrics.pixels <= 0 ? true : _extended,
+    };
+    if (extend != _extended) setState(() => _extended = extend);
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      height: 320,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
+      ),
+      child: Scaffold(
+        body: NotificationListener<UserScrollNotification>(
+          onNotification: _onScroll,
+          child: ListView.separated(
+            itemCount: _items.length,
+            separatorBuilder: (_, _) => const Divider(),
+            itemBuilder: (_, i) => ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: Text(_items[i]),
+            ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'fab-demo',
+          isExtended: _extended,
+          onPressed: () {},
+          icon: const Icon(Icons.add),
+          label: const Text('صنف جديد'),
+          tooltip: 'صنف جديد',
+        ),
+      ),
+    );
   }
 }
