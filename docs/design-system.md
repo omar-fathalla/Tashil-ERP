@@ -126,6 +126,29 @@ Source: **m3.material.io/components/divider/guidelines**. Tokens:
   lists in a scroll) are separated by spacing alone.
 - `VerticalDivider` only on wide layouts (list + details, rail + content).
 
+### Loading and progress
+Sources: **m3.material.io/components/loading-indicator/guidelines** and
+**/progress-indicators/guidelines**. Code:
+`lib/core/design/widgets/loading_indicator.dart`, theme in `app_theme.dart`.
+Live: playground tab "التنبيهات".
+
+| Expected wait | Show |
+| --- | --- |
+| Under 200ms | Nothing (`DelayedLoadingIndicator` waits 200ms before showing) |
+| 200ms to 5s, unknown length | `LoadingIndicator`, centred in the empty space |
+| Over 5s, or progress is known | `LinearProgressIndicator` / `CircularProgressIndicator`, determinate when possible |
+
+- Never switch from a loading indicator to a progress indicator mid-process.
+- Linear: on the top edge of its container or under the app bar.
+- Short task started by a button (printing): small circular indicator
+  inside the button, button disabled.
+- Pull to refresh: official `RefreshIndicator.noSpinner` + a contained
+  `LoadingIndicator` on top of the list.
+- Progress indicators use the M3 2024 look (gap, stop dot, rounded ends):
+  `ProgressIndicatorThemeData(year2023: false)` in the theme.
+- Not adopted: the optional Expressive *wavy* progress style. Flutter does
+  not ship it; revisit when it does.
+
 ### Dialogs
 Source: **m3.material.io/components/dialogs/guidelines**. Code:
 `lib/core/design/widgets/dialogs.dart`. Live: playground tab "التنبيهات".
@@ -251,6 +274,7 @@ page, and replace it with Flutter's version once it lands.
 | Button groups (standard, connected), sizes XS-XL | `ButtonGroup` in `widgets/button_group.dart` | m3.material.io/components/button-groups |
 | FAB menu (2-6 actions, focus on close button, Esc closes, toggle announced with expanded state) | `FabMenu` in `widgets/fab_menu.dart` | m3.material.io/components/fab-menu |
 | Expressive motion springs + curve conversions | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion/overview/specs |
+| Loading indicator (morphing shapes, contained) | `LoadingIndicator` in `widgets/loading_indicator.dart`, built on Flutter's official `MaterialShapes` + `MaterialShapeBorder` | m3.material.io/components/loading-indicator |
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
 
 ## Adding a component

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:animations/animations.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/dialogs.dart';
+import '../../../core/design/widgets/loading_indicator.dart';
 import 'common.dart';
 
 class FeedbackSection extends StatelessWidget {
@@ -198,20 +201,43 @@ class FeedbackSection extends StatelessWidget {
           ),
         ],
       ),
-      SpecSection(
+      const SpecSection(
+        title: 'مؤشر التحميل',
+        m3: 'Loading indicator',
+        spec: 'components/loading-indicator/guidelines',
+        rule:
+            'الانتظار أقل من 200ms: ولا حاجة. من 200ms لـ 5 ثواني: مؤشر '
+            'التحميل في نص المساحة الفاضية. أكتر من كده أو التقدم معروف: '
+            'مؤشر تقدم. ما تبدلش من ده لده في نص العملية.',
+        children: [
+          Demo([
+            LoadingIndicator(size: 24),
+            LoadingIndicator(),
+            LoadingIndicator(contained: true),
+            LoadingIndicator(size: 96),
+          ]),
+          SizedBox(height: TashilSpacing.md),
+          _LoadDemo(),
+        ],
+      ),
+      const SpecSection(
         title: 'مؤشرات التقدم',
         m3: 'Progress indicators',
-        spec: 'components/progress-indicators',
-        children: const [
-          LinearProgressIndicator(),
-          SizedBox(height: TashilSpacing.md),
-          LinearProgressIndicator(value: 0.6),
-          SizedBox(height: TashilSpacing.md),
-          Demo([
-            CircularProgressIndicator(),
-            CircularProgressIndicator(value: 0.75),
-          ]),
-        ],
+        spec: 'components/progress-indicators/guidelines',
+        rule:
+            'للعمليات الطويلة. Determinate لو نعرف النسبة (مزامنة 120 من '
+            '300). الخطي على حافة الكارت أو تحت شريط التطبيق، والدائري '
+            'الصغير جوه الزرار للعملية القصيرة.',
+        children: [_ProgressDemo()],
+      ),
+      const SpecSection(
+        title: 'السحب للتحديث',
+        m3: 'Pull to refresh',
+        spec: 'components/loading-indicator/guidelines#behavior',
+        rule:
+            'اسحب القائمة لتحت. مؤشر التحميل contained بيظهر فوق المحتوى '
+            'لحد ما التحديث يخلص.',
+        children: [_PullToRefreshDemo()],
       ),
       SpecSection(
         title: 'التلميح',
@@ -341,6 +367,236 @@ class _NewProductDialogState extends State<_NewProductDialog> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Loading a short list: nothing for 200ms, then the loading indicator in
+/// the middle of the empty space, then the content.
+class _LoadDemo extends StatefulWidget {
+  const _LoadDemo();
+
+  @override
+  State<_LoadDemo> createState() => _LoadDemoState();
+}
+
+class _LoadDemoState extends State<_LoadDemo> {
+  bool _loading = false;
+  Timer? _t;
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  void _load() {
+    setState(() => _loading = true);
+    _t = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Card.outlined(
+          margin: EdgeInsets.zero,
+          child: SizedBox(
+            height: 152,
+            child: _loading
+                ? const Center(child: DelayedLoadingIndicator())
+                : const Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(Icons.person_outline),
+                        title: Text('أحمد محمود'),
+                        subtitle: Text('رصيد آجل'),
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.person_outline),
+                        title: Text('منى السيد'),
+                        subtitle: Text('عميل نقدي'),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: TashilSpacing.sm),
+        OutlinedButton(
+          onPressed: _loading ? null : _load,
+          child: const Text('حمّل العملاء'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Determinate sync with a known count, indeterminate edge bar, and a
+/// short task inside a button.
+class _ProgressDemo extends StatefulWidget {
+  const _ProgressDemo();
+
+  @override
+  State<_ProgressDemo> createState() => _ProgressDemoState();
+}
+
+class _ProgressDemoState extends State<_ProgressDemo> {
+  static const _total = 300;
+  int _done = 120;
+  bool _printing = false;
+  Timer? _t;
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  void _sync() {
+    _t?.cancel();
+    setState(() => _done = 0);
+    _t = Timer.periodic(const Duration(milliseconds: 40), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _done = (_done + 6).clamp(0, _total));
+      if (_done >= _total) t.cancel();
+    });
+  }
+
+  Future<void> _print() async {
+    setState(() => _printing = true);
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    if (mounted) setState(() => _printing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Indeterminate, on the top edge of its container.
+        Card.outlined(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const LinearProgressIndicator(),
+              Padding(
+                padding: const EdgeInsets.all(TashilSpacing.lg),
+                child: Text('بيحمّل تقرير الشهر…', style: text.bodyMedium),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: TashilSpacing.lg),
+        // Determinate with a stop dot at the end of the track.
+        Text('مزامنة الفواتير: $_done من $_total', style: text.labelLarge),
+        const SizedBox(height: TashilSpacing.sm),
+        LinearProgressIndicator(
+          value: _done / _total,
+          semanticsLabel: 'مزامنة الفواتير',
+        ),
+        const SizedBox(height: TashilSpacing.md),
+        Demo([
+          SizedBox.square(
+            dimension: 48,
+            child: CircularProgressIndicator(value: _done / _total),
+          ),
+          const SizedBox.square(
+            dimension: 48,
+            child: CircularProgressIndicator(),
+          ),
+          OutlinedButton(onPressed: _sync, child: const Text('زامن')),
+        ]),
+        const SizedBox(height: TashilSpacing.md),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FilledButton.icon(
+            onPressed: _printing ? null : _print,
+            icon: _printing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : const Icon(Icons.print_outlined),
+            label: Text(_printing ? 'بيطبع…' : 'اطبع الإيصال'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Pull to refresh with the official RefreshIndicator (no spinner) and a
+/// contained loading indicator on top, as in the M3 guidelines.
+class _PullToRefreshDemo extends StatefulWidget {
+  const _PullToRefreshDemo();
+
+  @override
+  State<_PullToRefreshDemo> createState() => _PullToRefreshDemoState();
+}
+
+class _PullToRefreshDemoState extends State<_PullToRefreshDemo> {
+  RefreshIndicatorStatus? _status;
+  int _version = 1;
+
+  Future<void> _refresh() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _version++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final showing =
+        _status == RefreshIndicatorStatus.armed ||
+        _status == RefreshIndicatorStatus.refresh;
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: 220,
+        child: Stack(
+          children: [
+            RefreshIndicator.noSpinner(
+              onRefresh: _refresh,
+              onStatusChange: (s) => setState(() => _status = s),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  for (var i = 0; i < 6; i++)
+                    ListTile(
+                      leading: const Icon(Icons.receipt_long_outlined),
+                      title: Text('فاتورة ${1040 + i}'),
+                      subtitle: Text('تحديث رقم $_version'),
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              top: TashilSpacing.md,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: AnimatedScale(
+                  scale: showing ? 1 : 0,
+                  duration: TashilMotion.scaled(
+                    context,
+                    TashilMotion.fast.duration,
+                  ),
+                  curve: TashilMotion.fast.curve,
+                  child: showing
+                      ? const LoadingIndicator(contained: true)
+                      : const SizedBox.square(dimension: 48),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/design/widgets/loading_indicator.dart';
+
 import '../../core/providers.dart';
 import '../playground/playground_screen.dart';
 
@@ -63,7 +65,12 @@ class HomeScreen extends ConsumerWidget {
                         trailing: Text('${p.currentStock} ${p.unit}'),
                       ),
                   ],
-            loading: () => [const LinearProgressIndicator()],
+            loading: () => [
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: DelayedLoadingIndicator()),
+              ),
+            ],
             error: (e, _) => [Text('$e')],
           ),
         ],

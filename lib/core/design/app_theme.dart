@@ -76,6 +76,12 @@ abstract final class TashilTheme {
       dividerTheme: const DividerThemeData(space: 1),
       // Cairo is wider than Roboto: at 360dp the stock headlineLarge cuts
       // "الخميس، 26 نوفمبر". One step down keeps the whole date visible.
+      // M3 2024 progress indicators: gap between indicator and track, stop
+      // dot at the end of determinate linear ones, rounded ends. Flutter
+      // marks the flag deprecated only because false becomes the default
+      // later; it is the official opt-in until then.
+      // ignore: deprecated_member_use
+      progressIndicatorTheme: const ProgressIndicatorThemeData(year2023: false),
       datePickerTheme: DatePickerThemeData(
         headerHeadlineStyle: text.headlineSmall,
         rangePickerHeaderHeadlineStyle: text.headlineSmall,
