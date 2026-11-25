@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/providers.dart';
+import '../playground/playground_screen.dart';
 
 /// Placeholder dashboard until the POS and goods-receipt screens land (step 3).
 class HomeScreen extends ConsumerWidget {
@@ -13,7 +15,22 @@ class HomeScreen extends ConsumerWidget {
     final pending = ref.watch(pendingSyncCountProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('تسهيل ERP')),
+      appBar: AppBar(
+        title: const Text('تسهيل ERP'),
+        actions: [
+          // Component playground is a developer tool, hidden in release.
+          if (kDebugMode)
+            IconButton(
+              tooltip: 'مكونات Material 3',
+              icon: const Icon(Icons.widgets_outlined),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PlaygroundScreen(),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

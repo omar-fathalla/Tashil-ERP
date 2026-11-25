@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'core/design/app_localizations.dart';
+import 'core/design/app_theme.dart';
 import 'features/home/home_screen.dart';
 
 void main() {
@@ -15,12 +17,12 @@ class TashilApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tashil ERP',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B6E4F)),
-      ),
-      // Arabic-first UI on the SUNMI device.
-      builder: (context, child) =>
-          Directionality(textDirection: TextDirection.rtl, child: child!),
+      theme: TashilTheme.light(),
+      darkTheme: TashilTheme.dark(),
+      // Arabic-first UI on the SUNMI device; the `ar` locale makes it RTL.
+      locale: TashilLocale.arabic,
+      supportedLocales: TashilLocale.supported,
+      localizationsDelegates: TashilLocale.delegates,
       home: const HomeScreen(),
     );
   }
