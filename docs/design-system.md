@@ -97,9 +97,10 @@ so you can check any component under each condition.
 | Report period | `ButtonGroup` presets + `showDateRangePicker` (calendar only) for a custom range | Full screen on compact |
 | Time in a form | `ScrollTimePicker` inline | Keyboard toggle always present; 12/24h from the device |
 | Time in a dialog | `showTimePicker` (dial) | Dial only in dialogs. Preset times use `ButtonGroup` or a menu |
-| Main navigation on the device | `NavigationBar` | 3 to 5 destinations |
-| Wide screens (> 600 dp) | `NavigationRail` | |
-| Secondary destinations | `NavigationDrawer` | Customers, suppliers, expenses, shift |
+| App shell (picks bar or rail by width) | `AdaptiveNavigationScaffold` | Bar below 600dp, collapsed rail from 600, expanded rail from 1200 |
+| Main navigation on the device | `HidingNavigationBar` (official `NavigationBar`) | 3 to 5 destinations, labels always, 64dp, hides on scroll down |
+| Wide screens (600 dp and up) | `TashilNavigationRail` (official `NavigationRail`) | Collapsed 96dp; menu button expands it; FAB under the menu button |
+| Secondary destinations | Expanded rail; on compact `ModalNavigationRail` from the app bar menu | `NavigationDrawer` is no longer recommended by M3: do not use it |
 | Confirm an irreversible action | `AlertDialog` via `showTashilDialog` | Text buttons; confirm says what happens ("إلغاء الفاتورة") |
 | Acknowledge (printer out of paper) | `AlertDialog`, one action | Only acknowledgement dialogs have a single button |
 | Pick one item (return reason) | `showChoiceDialog` | Title and buttons pinned, list scrolls, confirm disabled until a choice |
@@ -206,6 +207,33 @@ Source: **m3.material.io/components/chips/guidelines**. Code:
 - More than two rows of chips: switch to one horizontally scrolling row.
 - The trailing icon sits at the end of the chip, so on the left in Arabic.
 
+### Navigation
+Sources: **m3.material.io/components/navigation-bar/guidelines**,
+**navigation-rail/guidelines**, **navigation-drawer/guidelines**. Code:
+`lib/core/design/widgets/navigation.dart`. Live: playground tab "التنقل".
+
+- One navigation per screen: the bar on compact, the rail from 600dp.
+  Never both at once.
+- **Bar:** 3 to 5 destinations, labels always shown, filled icon on the
+  selected one, 64dp (Expressive flexible bar). It hides while the content
+  scrolls down and comes back on scroll up, but never while a screen
+  reader is on.
+- **Rail:** collapsed is 96dp with labels under the icons; the menu button
+  at the top expands it (240dp+, labels beside icons) to show the
+  secondary destinations too. The FAB, if any, sits under the menu button
+  and becomes an extended FAB when the rail expands. Its content scrolls
+  when it does not fit.
+- **Drawer:** M3 no longer recommends the navigation drawer. Secondary
+  destinations (customers, suppliers, expenses, shift) live in the
+  expanded rail. On compact it opens as a modal over the content from the
+  menu button in the app bar (`ModalNavigationRail`, on Flutter's `Drawer`
+  for scrim, swipe and back to close).
+- Badges: a dot (`badge: 0`) for "something new", a number for a count,
+  999+ at most.
+- Not adopted: the horizontal bar items for medium windows, because we
+  switch to the rail at 600dp; section headers inside the rail, because
+  Flutter's `NavigationRail` has no slot for them yet.
+
 ### Menus
 Source: **m3.material.io/components/menus/guidelines**. Code:
 `lib/core/design/widgets/menus.dart`. Live: playground tab "المدخلات",
@@ -305,6 +333,7 @@ page, and replace it with Flutter's version once it lands.
 | Expressive motion springs + curve conversions | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion/overview/specs |
 | Loading indicator (morphing shapes, contained) | `LoadingIndicator` in `widgets/loading_indicator.dart`, built on Flutter's official `MaterialShapes` + `MaterialShapeBorder` | m3.material.io/components/loading-indicator |
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
+| Hiding navigation bar, collapsible rail with menu button, modal expanded rail, adaptive shell | `navigation.dart`, composed from the official `NavigationBar`, `NavigationRail`, `Drawer` | m3.material.io/components/navigation-rail/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component

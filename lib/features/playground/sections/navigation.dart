@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/tokens.dart';
+import '../../../core/design/widgets/button_group.dart';
+import '../../../core/design/widgets/navigation.dart';
 import 'common.dart';
 
 class NavigationSection extends StatefulWidget {
@@ -11,15 +13,61 @@ class NavigationSection extends StatefulWidget {
 }
 
 class _NavigationSectionState extends State<NavigationSection> {
-  int _bar = 0;
   int _rail = 0;
+  int _modal = 0;
+  int _adaptive = 0;
+  bool _railExpanded = false;
+  double _width = 360;
 
-  static const _dest = [
-    (Icons.point_of_sale_outlined, Icons.point_of_sale, 'البيع'),
-    (Icons.inventory_2_outlined, Icons.inventory_2, 'المخزون'),
-    (Icons.bar_chart_outlined, Icons.bar_chart, 'التقارير'),
-    (Icons.settings_outlined, Icons.settings, 'الإعدادات'),
+  static const _primary = [
+    TashilDestination(
+      icon: Icons.point_of_sale_outlined,
+      selectedIcon: Icons.point_of_sale,
+      label: 'البيع',
+    ),
+    TashilDestination(
+      icon: Icons.inventory_2_outlined,
+      selectedIcon: Icons.inventory_2,
+      label: 'المخزون',
+      badge: 3,
+    ),
+    TashilDestination(
+      icon: Icons.bar_chart_outlined,
+      selectedIcon: Icons.bar_chart,
+      label: 'التقارير',
+    ),
+    TashilDestination(
+      icon: Icons.sync_outlined,
+      selectedIcon: Icons.sync,
+      label: 'المزامنة',
+      badge: 0,
+    ),
   ];
+
+  static const _secondary = [
+    TashilDestination(
+      icon: Icons.people_outline,
+      selectedIcon: Icons.people,
+      label: 'العملاء',
+    ),
+    TashilDestination(
+      icon: Icons.local_shipping_outlined,
+      selectedIcon: Icons.local_shipping,
+      label: 'الموردين',
+    ),
+    TashilDestination(
+      icon: Icons.receipt_long_outlined,
+      selectedIcon: Icons.receipt_long,
+      label: 'المصروفات',
+    ),
+    TashilDestination(
+      icon: Icons.schedule_outlined,
+      selectedIcon: Icons.schedule,
+      label: 'الوردية',
+    ),
+  ];
+
+  static const _all = [..._primary, ..._secondary];
 
   Widget _frame(Widget child, {double height = 200}) => Container(
     height: height,
@@ -37,100 +85,116 @@ class _NavigationSectionState extends State<NavigationSection> {
       SpecSection(
         title: 'شريط التنقل السفلي',
         m3: 'Navigation bar',
-        spec: 'components/navigation-bar',
+        spec: 'components/navigation-bar/guidelines',
         rule:
-            'التنقل الرئيسي على SUNMI V3 (شاشة compact). '
-            '3 لـ 5 وجهات بس.',
-        children: [
-          _frame(
-            Scaffold(
-              body: Center(child: Text(_dest[_bar].$3)),
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: _bar,
-                onDestinationSelected: (i) => setState(() => _bar = i),
-                destinations: [
-                  for (final (i, s, l) in _dest)
-                    NavigationDestination(
-                      icon: Badge(
-                        isLabelVisible: l == 'المخزون',
-                        label: const Text('3'),
-                        child: Icon(i),
-                      ),
-                      selectedIcon: Icon(s),
-                      label: l,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
+            'التنقل الرئيسي على SUNMI V3 (compact). 3 لـ 5 وجهات، والاسم '
+            'ظاهر دايماً تحت الأيقونة، وارتفاعه 64. بيختفي لما تنزل في '
+            'المحتوى ويرجع لما تطلع. ما يتحطش مع القضيب الجانبي في نفس الشاشة.',
+        children: [_frame(_BarDemo(dest: _primary), height: 320)],
       ),
       SpecSection(
         title: 'القضيب الجانبي',
         m3: 'Navigation rail',
-        spec: 'components/navigation-rail',
-        rule: 'بدل الشريط السفلي لما العرض > 600 (تابلت أو شاشة أفقية).',
+        spec: 'components/navigation-rail/guidelines',
+        rule:
+            'بدل الشريط السفلي من عرض 600 (تابلت أو شاشة أفقية). مضغوط '
+            '(96) والأسماء تحت الأيقونات، وزرار القائمة فوق بيفرده عشان '
+            'يبان كل الوجهات. زرار الإضافة (FAB) تحت زرار القائمة.',
         children: [
           _frame(
             Row(
               children: [
-                NavigationRail(
+                TashilNavigationRail(
+                  primary: _primary,
+                  secondary: _secondary,
                   selectedIndex: _rail,
-                  labelType: NavigationRailLabelType.all,
+                  expanded: _railExpanded,
+                  onMenu: () => setState(() => _railExpanded = !_railExpanded),
                   onDestinationSelected: (i) => setState(() => _rail = i),
-                  destinations: [
-                    for (final (i, s, l) in _dest.take(3))
-                      NavigationRailDestination(
-                        icon: Icon(i),
-                        selectedIcon: Icon(s),
-                        label: Text(l),
-                      ),
-                  ],
+                  fab: (
+                    icon: Icons.add,
+                    label: 'فاتورة جديدة',
+                    onPressed: () {},
+                  ),
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text(_dest[_rail].$3))),
+                Expanded(child: Center(child: Text(_all[_rail].label))),
               ],
             ),
-            height: 280,
+            height: 460,
           ),
         ],
       ),
       SpecSection(
-        title: 'القائمة الجانبية',
+        title: 'القضيب الممتد المنبثق (بدل القائمة الجانبية)',
         m3: 'Navigation drawer',
-        spec: 'components/navigation-drawer',
-        rule: 'للوجهات الثانوية: العملاء، الموردين، المصروفات، الوردية.',
+        spec: 'components/navigation-drawer/guidelines',
+        rule:
+            'M3 ما بقاش بينصح بالـ Navigation drawer. الوجهات الثانوية '
+            '(العملاء، الموردين، المصروفات، الوردية) بقت في القضيب الممتد. '
+            'على الموبايل بيفتح فوق المحتوى من زرار القائمة في شريط التطبيق.',
         children: [
           _frame(
-            Builder(
-              builder: (context) => Scaffold(
-                appBar: AppBar(title: const Text('تسهيل')),
-                drawer: NavigationDrawer(
-                  selectedIndex: 0,
-                  onDestinationSelected: (_) => Navigator.pop(context),
-                  children: const [
-                    Padding(
-                      padding: EdgeInsets.all(TashilSpacing.page),
-                      child: Text('القائمة'),
+            Scaffold(
+              appBar: AppBar(title: const Text('تسهيل')),
+              drawer: ModalNavigationRail(
+                primary: _primary,
+                secondary: _secondary,
+                selectedIndex: _modal,
+                onDestinationSelected: (i) => setState(() => _modal = i),
+              ),
+              body: Center(child: Text(_all[_modal].label)),
+            ),
+            height: 320,
+          ),
+        ],
+      ),
+      SpecSection(
+        title: 'تنقل متكيف حسب حجم الشاشة',
+        m3: 'Adaptive design',
+        spec: 'components/navigation-rail/guidelines#adaptive-design',
+        rule:
+            'AdaptiveNavigationScaffold بيختار لوحده: أقل من 600 شريط '
+            'سفلي، من 600 قضيب مضغوط، من 1200 قضيب ممتد. اختار عرض الشاشة:',
+        children: [
+          ButtonGroup<double>(
+            variant: ButtonGroupVariant.connected,
+            selected: {_width},
+            onSelectionChanged: (v) => setState(() => _width = v.first),
+            items: const [
+              ButtonGroupItem(value: 360, label: '360'),
+              ButtonGroupItem(value: 840, label: '840'),
+              ButtonGroupItem(value: 1280, label: '1280'),
+            ],
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          _frame(
+            FittedBox(
+              child: SizedBox(
+                width: _width,
+                height: 640,
+                child: AdaptiveNavigationScaffold(
+                  key: ValueKey(_width),
+                  title: 'تسهيل',
+                  primary: _primary,
+                  secondary: _secondary,
+                  selectedIndex: _adaptive,
+                  onDestinationSelected: (i) => setState(() => _adaptive = i),
+                  fab: (
+                    icon: Icons.add,
+                    label: 'فاتورة جديدة',
+                    onPressed: () {},
+                  ),
+                  body: ListView.builder(
+                    itemCount: 30,
+                    itemBuilder: (_, i) => ListTile(
+                      title: Text('${_all[_adaptive].label} ${i + 1}'),
                     ),
-                    NavigationDrawerDestination(
-                      icon: Icon(Icons.people_outline),
-                      label: Text('العملاء'),
-                    ),
-                    NavigationDrawerDestination(
-                      icon: Icon(Icons.local_shipping_outlined),
-                      label: Text('الموردين'),
-                    ),
-                    NavigationDrawerDestination(
-                      icon: Icon(Icons.receipt_long_outlined),
-                      label: Text('المصروفات'),
-                    ),
-                  ],
+                  ),
                 ),
-                body: const Center(child: Text('اضغط ☰ لفتح القائمة')),
               ),
             ),
-            height: 240,
+            height: 400,
           ),
         ],
       ),
@@ -198,4 +262,43 @@ class _NavigationSectionState extends State<NavigationSection> {
       ),
     ]);
   }
+}
+
+/// A screen with a long list and the hiding navigation bar.
+class _BarDemo extends StatefulWidget {
+  const _BarDemo({required this.dest});
+  final List<TashilDestination> dest;
+
+  @override
+  State<_BarDemo> createState() => _BarDemoState();
+}
+
+class _BarDemoState extends State<_BarDemo> {
+  final _visible = HideOnScroll();
+  int _i = 0;
+
+  @override
+  void dispose() {
+    _visible.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: _visible.listener(
+      child: ListView.builder(
+        itemCount: 30,
+        itemBuilder: (_, n) => ListTile(
+          title: Text('${widget.dest[_i].label}: سطر ${n + 1}'),
+          subtitle: n == 0 ? const Text('انزل في القائمة: الشريط يختفي') : null,
+        ),
+      ),
+    ),
+    bottomNavigationBar: HidingNavigationBar(
+      visible: _visible,
+      destinations: widget.dest,
+      selectedIndex: _i,
+      onDestinationSelected: (i) => setState(() => _i = i),
+    ),
+  );
 }
