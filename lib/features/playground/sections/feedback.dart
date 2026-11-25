@@ -1,6 +1,9 @@
+import 'package:animations/animations.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
+import '../../../core/design/widgets/dialogs.dart';
 import 'common.dart';
 
 class FeedbackSection extends StatelessWidget {
@@ -10,68 +13,139 @@ class FeedbackSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return SectionList([
       SpecSection(
-        title: 'الحوارات',
-        m3: 'Dialogs',
-        spec: 'components/dialogs',
+        title: 'حوار أساسي',
+        m3: 'Basic dialog',
+        spec: 'components/dialogs/guidelines',
         rule:
-            'Dialog للتأكيد قبل إجراء مش بيترجع (إلغاء فاتورة، حذف). '
-            'الزر الخطر على النهاية.',
+            'للحاجات المهمة اللي بتوقف الشغل بس. عنوان واضح، أزرار نصية، '
+            'زرار التأكيد بيقول هيحصل إيه وعلى الطرف (شمال في العربي). '
+            'لو المعلومة مش مهمة استخدم Snackbar.',
         children: [
           Demo([
             OutlinedButton(
-              onPressed: () => showDialog<void>(
+              onPressed: () => showTashilDialog<void>(
                 context: context,
                 builder: (c) => AlertDialog(
-                  icon: const Icon(Icons.warning_amber_rounded),
-                  title: const Text('إلغاء الفاتورة؟'),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  title: const Text('إلغاء الفاتورة رقم 1042؟'),
                   content: const Text(
-                    'هيتعمل مرتجع للمخزون والفاتورة هتفضل في السجل كملغاة.',
+                    'هيتعمل مرتجع للمخزون، والفاتورة هتفضل في السجل كملغاة.',
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(c),
                       child: const Text('رجوع'),
                     ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Theme.of(c).colorScheme.error,
-                        foregroundColor: Theme.of(c).colorScheme.onError,
-                      ),
+                    TextButton(
                       onPressed: () => Navigator.pop(c),
                       child: const Text('إلغاء الفاتورة'),
                     ),
                   ],
                 ),
               ),
-              child: const Text('Basic dialog'),
+              child: const Text('تأكيد'),
             ),
             OutlinedButton(
-              onPressed: () => showDialog<void>(
+              onPressed: () => showTashilDialog<void>(
                 context: context,
-                builder: (c) => Dialog.fullscreen(
-                  child: Scaffold(
-                    appBar: AppBar(
-                      leading: CloseButton(onPressed: () => Navigator.pop(c)),
-                      title: const Text('صنف جديد'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(c),
-                          child: const Text('حفظ'),
-                        ),
-                      ],
+                barrierDismissible: false,
+                builder: (c) => AlertDialog(
+                  icon: const Icon(Icons.print_disabled_outlined),
+                  title: const Text('الطابعة مفيهاش ورق'),
+                  content: const Text(
+                    'الفاتورة اتحفظت. حط رول ورق جديد واطبعها من السجل.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(c),
+                      child: const Text('حسنًا'),
                     ),
-                    body: const Padding(
-                      padding: EdgeInsets.all(TashilSpacing.page),
-                      child: TextField(
-                        decoration: InputDecoration(labelText: 'اسم الصنف'),
+                  ],
+                ),
+              ),
+              child: const Text('إقرار بزرار واحد'),
+            ),
+            OutlinedButton(
+              onPressed: () async {
+                final r = await showChoiceDialog<String>(
+                  context: context,
+                  title: 'سبب المرتجع',
+                  confirmLabel: 'تسجيل المرتجع',
+                  options: const {
+                    'damaged': 'تالف',
+                    'expired': 'منتهي الصلاحية',
+                    'wrong': 'صنف غلط',
+                    'customer': 'العميل غيّر رأيه',
+                    'price': 'خطأ في السعر',
+                    'duplicate': 'اتسجل مرتين',
+                    'other': 'سبب تاني',
+                  },
+                );
+                if (r != null && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('اتسجل المرتجع')),
+                  );
+                }
+              },
+              child: const Text('اختيار من قائمة'),
+            ),
+          ]),
+        ],
+      ),
+      SpecSection(
+        title: 'حوار بملء الشاشة',
+        m3: 'Full-screen dialog',
+        spec: 'components/dialogs/guidelines#full-screen-dialog',
+        rule:
+            'لفورم فيه كتابة على الموبايل بس، ومن 600dp يبقى حوار أساسي. '
+            'بيفتح من الزرار بـ container transform. أخطاء الحقول تحت '
+            'الحقل، وفشل الحفظ بس هو اللي ياخد حوار. لو قفلت وفيه تعديلات '
+            'بيسألك تتجاهلها ولا لأ.',
+        children: [
+          OpenContainer(
+            transitionDuration: TashilTransitions.containerTransform(context),
+            closedColor: Theme.of(context).colorScheme.primaryContainer,
+            closedElevation: 3,
+            closedShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(TashilRadius.large),
+            ),
+            openBuilder: (context, _) => const _NewProductDialog(),
+            closedBuilder: (context, open) => InkWell(
+              onTap: open,
+              child: SizedBox(
+                height: 56,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TashilSpacing.lg,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.add,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
-                    ),
+                      const SizedBox(width: TashilSpacing.sm),
+                      Text(
+                        'صنف جديد',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              child: const Text('Full-screen dialog'),
             ),
-          ]),
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          Text(
+            'جرب: احفظ والاسم فاضي، اكتب حاجة واقفل، أو اكتب "فشل" في '
+            'الاسم عشان تشوف حوار فشل الحفظ.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
       SpecSection(
@@ -169,5 +243,105 @@ class FeedbackSection extends StatelessWidget {
         ],
       ),
     ]);
+  }
+}
+
+/// Full-screen "new product" form used by the dialogs demo.
+class _NewProductDialog extends StatefulWidget {
+  const _NewProductDialog();
+
+  @override
+  State<_NewProductDialog> createState() => _NewProductDialogState();
+}
+
+class _NewProductDialogState extends State<_NewProductDialog> {
+  final _name = TextEditingController();
+  final _price = TextEditingController();
+  String? _nameError;
+  String? _priceError;
+  bool _saving = false;
+
+  bool get _dirty => _name.text.isNotEmpty || _price.text.isNotEmpty;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _price.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _nameError = _name.text.trim().isEmpty ? 'اكتب اسم الصنف' : null;
+      _priceError = double.tryParse(_price.text) == null
+          ? 'اكتب السعر بالأرقام، مثلاً 12.50'
+          : null;
+    });
+    if (_nameError != null || _priceError != null) return;
+    setState(() => _saving = true);
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (_name.text.contains('فشل')) {
+      await showTashilDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('تعذّر الحفظ'),
+          content: const Text(
+            'مساحة التخزين على الجهاز خلصت. امسح صور أو ملفات قديمة '
+            'وجرب تاني. البيانات اللي كتبتها لسه موجودة.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('حسنًا'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('اتضاف "${_name.text}"')));
+    _name.clear();
+    _price.clear();
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FormDialog(
+      title: 'صنف جديد',
+      saveLabel: 'حفظ',
+      dirty: _dirty,
+      saving: _saving,
+      onSave: _save,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            autofocus: true,
+            onChanged: (_) => setState(() => _nameError = null),
+            decoration: InputDecoration(
+              labelText: 'اسم الصنف',
+              errorText: _nameError,
+            ),
+          ),
+          const SizedBox(height: TashilSpacing.md),
+          TextField(
+            controller: _price,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() => _priceError = null),
+            decoration: InputDecoration(
+              labelText: 'سعر البيع',
+              suffixText: 'ج.م',
+              errorText: _priceError,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

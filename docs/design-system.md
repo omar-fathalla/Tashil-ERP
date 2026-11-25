@@ -100,14 +100,35 @@ so you can check any component under each condition.
 | Main navigation on the device | `NavigationBar` | 3 to 5 destinations |
 | Wide screens (> 600 dp) | `NavigationRail` | |
 | Secondary destinations | `NavigationDrawer` | Customers, suppliers, expenses, shift |
-| Confirm an irreversible action | `AlertDialog` | Destructive button uses `error` colours |
-| Create/edit form on phone | `Dialog.fullscreen` | |
+| Confirm an irreversible action | `AlertDialog` via `showTashilDialog` | Text buttons; confirm says what happens ("إلغاء الفاتورة") |
+| Acknowledge (printer out of paper) | `AlertDialog`, one action | Only acknowledgement dialogs have a single button |
+| Pick one item (return reason) | `showChoiceDialog` | Title and buttons pinned, list scrolls, confirm disabled until a choice |
+| Create/edit form | `FormDialog` | Full screen on compact, basic dialog from 600dp; asks before discarding edits |
 | Quick options on an item | `showModalBottomSheet` (drag handle) | |
 | Confirmation with undo | `SnackBar` (floating) | Not for serious errors |
 | Persistent state (offline, shift closed) | `MaterialBanner` | |
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
+
+### Dialogs
+Source: **m3.material.io/components/dialogs/guidelines**. Code:
+`lib/core/design/widgets/dialogs.dart`. Live: playground tab "التنبيهات".
+
+- Only for high-importance prompts that block the task. Anything else is a
+  `SnackBar` (or a menu for options).
+- Open with `showTashilDialog` (M3 enter/exit: fade + scale), not
+  `showDialog`.
+- Headline: a short clear statement or question, no apologies, no
+  "هل أنت متأكد؟".
+- Text buttons, at most two. Confirm is at the end (left in Arabic) and
+  names the result; dismiss comes before it and is never disabled. A
+  single button only for acknowledgement. No "اعرف أكتر" third action.
+- Full-screen dialogs: compact screens only, opened from the button with a
+  container transform, ✕ is the only navigation, the save action is named.
+  Field errors inline; a dialog only when saving fails. Closing with edits
+  asks "تتجاهل التعديلات؟".
+- Long content scrolls inside; title and buttons stay fixed.
 
 ### Dates and times
 Sources: **m3.material.io/components/date-pickers/guidelines** and
