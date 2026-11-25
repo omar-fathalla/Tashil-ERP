@@ -236,6 +236,7 @@ page, and replace it with Flutter's version once it lands.
 | Button groups (standard, connected), sizes XS-XL | `ButtonGroup` in `widgets/button_group.dart` | m3.material.io/components/button-groups |
 | FAB menu (2-6 actions, focus on close button, Esc closes, toggle announced with expanded state) | `FabMenu` in `widgets/fab_menu.dart` | m3.material.io/components/fab-menu |
 | Expressive motion springs + curve conversions | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion/overview/specs |
+| Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
 
 ## Adding a component
 1. Check it exists in M3 (m3.material.io) and in Flutter's Material library.
@@ -246,3 +247,19 @@ page, and replace it with Flutter's version once it lands.
    spec path, one-line rule).
 5. `flutter test test/design` must pass (it scrolls every tab, light and dark,
    at 360 dp and fails on overflow).
+
+## Updating from M3 pages (standing rule)
+The product owner collects official M3 pages (m3.material.io links or
+screenshots) and sends them in. Every time one arrives, without waiting
+for a separate request:
+
+1. Compare the page with the matching code in `lib/core/design/` and its
+   playground section.
+2. Say briefly what already followed it and what did not.
+3. Update the component to the page: official Flutter / Google widgets
+   first; build our own only when Flutter has no equivalent, and add it to
+   the table above.
+4. Add or update tests, and the rule in this file.
+5. Rebuild the live playground, push to the open PR, and share the link.
+
+The same applies to any newer M3 guidance found while doing this.
