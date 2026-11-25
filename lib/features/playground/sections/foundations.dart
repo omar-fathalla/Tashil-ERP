@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
 import 'common.dart';
 
@@ -148,6 +149,105 @@ class FoundationsSection extends StatelessWidget {
             ),
         ],
       ),
+      const SpecSection(
+        title: 'الحركة',
+        m3: 'Motion · springs (M3 Expressive)',
+        spec: 'styles/motion/overview',
+        rule:
+            'كل حركة داخل الشاشة spring من TashilSpring. Spatial للمكان '
+            'والحجم والشكل (بيعمل نطّة)، Effects للون والشفافية (من غير '
+            'نطّة). الانتقال بين الشاشات Durations + Easing.',
+        children: [_MotionDemo()],
+      ),
     ]);
+  }
+}
+
+class _MotionDemo extends StatefulWidget {
+  const _MotionDemo();
+
+  @override
+  State<_MotionDemo> createState() => _MotionDemoState();
+}
+
+class _MotionDemoState extends State<_MotionDemo> {
+  bool _on = false;
+
+  static const _spatial = [
+    (TashilSpring.fastSpatial, 'fast spatial'),
+    (TashilSpring.defaultSpatial, 'default spatial'),
+    (TashilSpring.slowSpatial, 'slow spatial'),
+    (TashilSpring.standardDefaultSpatial, 'standard default'),
+  ];
+
+  static const _effects = [
+    (TashilSpring.fastEffects, 'fast effects'),
+    (TashilSpring.defaultEffects, 'default effects'),
+    (TashilSpring.slowEffects, 'slow effects'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    Widget label(TashilSpring sp, String name) => Text(
+      '$name · damping ${sp.dampingRatio} · stiffness '
+      '${sp.stiffness.toInt()} · ${sp.duration.inMilliseconds}ms',
+      style: text.labelSmall?.copyWith(color: s.onSurfaceVariant),
+      textDirection: TextDirection.ltr,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FilledButton.icon(
+          onPressed: () => setState(() => _on = !_on),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('شغّل الحركة'),
+        ),
+        const SizedBox(height: TashilSpacing.md),
+        for (final (sp, name) in _spatial) ...[
+          label(sp, name),
+          Container(
+            height: 40,
+            margin: const EdgeInsets.only(bottom: TashilSpacing.sm),
+            decoration: BoxDecoration(
+              color: s.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(TashilRadius.full),
+            ),
+            child: AnimatedAlign(
+              duration: TashilMotion.scaled(context, sp.duration),
+              curve: sp.curve,
+              alignment: _on
+                  ? AlignmentDirectional.centerEnd
+                  : AlignmentDirectional.centerStart,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: s.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: TashilSpacing.sm),
+        for (final (sp, name) in _effects) ...[
+          label(sp, name),
+          AnimatedContainer(
+            duration: TashilMotion.scaled(context, sp.duration),
+            curve: sp.curve,
+            height: 32,
+            margin: const EdgeInsets.only(bottom: TashilSpacing.sm),
+            decoration: BoxDecoration(
+              color: _on ? s.tertiary : s.tertiaryContainer,
+              borderRadius: BorderRadius.circular(TashilRadius.small),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }

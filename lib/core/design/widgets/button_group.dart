@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../motion.dart';
+
 /// M3 Expressive **button groups**
 /// (m3.material.io/components/button-groups), which Flutter's Material
 /// library does not ship yet. Built from plain Material + InkWell so it
@@ -108,8 +110,8 @@ class ButtonGroup<T> extends StatefulWidget {
 class _ButtonGroupState<T> extends State<ButtonGroup<T>> {
   int? _pressed;
 
-  static const _duration = Duration(milliseconds: 200);
-  static const _curve = Curves.easeOutBack;
+  // Shape and width morph: M3 Expressive fast spatial spring.
+  static const _spring = TashilMotion.fast;
 
   bool get _connected => widget.variant == ButtonGroupVariant.connected;
 
@@ -206,8 +208,8 @@ class _ButtonGroupState<T> extends State<ButtonGroup<T>> {
 
       final radius = _radius(i, isSelected, isPressed);
       Widget button = AnimatedContainer(
-        duration: _duration,
-        curve: _curve,
+        duration: TashilMotion.scaled(context, _spring.duration),
+        curve: _spring.curve,
         height: size.height,
         constraints: BoxConstraints(minWidth: size.height),
         padding: EdgeInsetsDirectional.symmetric(horizontal: pad),

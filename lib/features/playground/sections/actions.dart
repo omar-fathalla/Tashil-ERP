@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/button_group.dart';
+import '../../../core/design/widgets/fab_menu.dart';
 import 'common.dart';
 
 enum _Pay { cash, card, credit }
@@ -132,6 +133,15 @@ class _ActionsSectionState extends State<ActionsSection> {
             'جديدة). بيتقفل لأيقونة بس لما تنزل في القائمة ويرجع يفتح لما '
             'تطلع. مكانه تحت على الطرف (يسار في العربي) فوق شريط التنقل.',
         children: [_ExtendedFabDemo()],
+      ),
+      const SpecSection(
+        title: 'قائمة الزر العائم',
+        m3: 'FAB menu',
+        spec: 'components/fab-menu/accessibility',
+        rule:
+            'من 2 لـ 6 إجراءات مرتبطة ببعض بتطلع من الـ FAB، زي (فاتورة، '
+            'صنف، استلام بضاعة). الفوكس بيبدأ على زرار الإغلاق، وEsc بيقفل.',
+        children: [_FabMenuDemo()],
       ),
       SpecSection(
         title: 'مجموعات الأزرار',
@@ -337,6 +347,53 @@ class _ExtendedFabDemoState extends State<_ExtendedFabDemo> {
           icon: const Icon(Icons.add),
           label: const Text('صنف جديد'),
           tooltip: 'صنف جديد',
+        ),
+      ),
+    );
+  }
+}
+
+class _FabMenuDemo extends StatelessWidget {
+  const _FabMenuDemo();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    void done(String what) =>
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(what)));
+    return Container(
+      height: 380,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
+      ),
+      child: Scaffold(
+        body: const Center(child: Text('اضغط + تحت')),
+        floatingActionButton: FabMenu(
+          items: [
+            FabMenuItem(
+              icon: Icons.point_of_sale_outlined,
+              label: 'فاتورة بيع',
+              onPressed: () => done('فاتورة بيع'),
+            ),
+            FabMenuItem(
+              icon: Icons.inventory_2_outlined,
+              label: 'صنف جديد',
+              onPressed: () => done('صنف جديد'),
+            ),
+            FabMenuItem(
+              icon: Icons.local_shipping_outlined,
+              label: 'استلام بضاعة',
+              onPressed: () => done('استلام بضاعة'),
+            ),
+            FabMenuItem(
+              icon: Icons.receipt_long_outlined,
+              label: 'مصروف',
+              onPressed: () => done('مصروف'),
+            ),
+          ],
         ),
       ),
     );

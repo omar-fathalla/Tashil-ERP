@@ -80,6 +80,8 @@ so you can check any component under each condition.
 | Secondary action | `FilledButton.tonal` / `OutlinedButton` | |
 | Cancel / low emphasis | `TextButton` | |
 | Most important action (scan, add) | `FloatingActionButton` | |
+| Main action that needs a label (new item, new invoice) | `FloatingActionButton.extended` | Collapses to icon on scroll down, expands on scroll up |
+| 2-6 related creation actions from one FAB | `FabMenu` | Focus starts on the close button |
 | 2-5 exclusive options (payment method, report period) | `ButtonGroup` connected | Replaces `SegmentedButton`, which M3 no longer recommends. Do not use `SegmentedButton` |
 | Related actions or toggles in one row | `ButtonGroup` standard | Pressed button widens, corners morph |
 | Icon-only action | `IconButton` | Always has a `tooltip` |
@@ -98,6 +100,31 @@ so you can check any component under each condition.
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
 
+### Motion
+Source: **m3.material.io/styles/motion** (component pages only describe each
+component's own behaviour in their "Behavior" section).
+
+- Movement inside a screen uses **springs** from `TashilSpring`
+  (`lib/core/design/motion.dart`), M3 Expressive scheme. Values are the
+  official tokens (copied from Jetpack Compose's generated
+  `ExpressiveMotionTokens`, token version 41.1.19):
+
+  | Token | Damping | Stiffness | Use |
+  | --- | --- | --- | --- |
+  | `fastSpatial` | 0.6 | 800 | Small parts: button press, shape morph, toggle |
+  | `defaultSpatial` | 0.8 | 380 | Most movement: menus opening, cards, sheets |
+  | `slowSpatial` | 0.8 | 200 | Large or full-screen movement |
+  | `fastEffects` / `defaultEffects` / `slowEffects` | 1.0 | 3800 / 1600 / 800 | Colour and opacity (never bounce) |
+  | `standard*Spatial` | 0.9 | 1400 / 700 / 300 | Calm variant for dense data screens (reports) |
+
+- Implicit animations: `duration: spring.duration, curve: spring.curve`.
+  Explicit ones: `controller.animateWith(SpringSimulation(spring.description, ...))`.
+- Never hand-pick a curve or duration (`Curves.easeOutBack`, `200ms`).
+- Screen-to-screen transitions keep M3 `Durations` + `Easing`
+  (e.g. `Durations.medium4`, `Easing.emphasizedDecelerate`).
+- Wrap durations in `TashilMotion.scaled(context, d)` so the system
+  "remove animations" setting turns motion off.
+
 ### Localisation and direction
 - App locale is `ar_EG`, which makes the whole tree RTL and translates built-in
   widgets (date picker, time picker, text selection).
@@ -112,6 +139,8 @@ page, and replace it with Flutter's version once it lands.
 | Component | Ours | Spec |
 | --- | --- | --- |
 | Button groups (standard, connected), sizes XS-XL | `ButtonGroup` in `widgets/button_group.dart` | m3.material.io/components/button-groups |
+| FAB menu (2-6 actions, focus on close button, Esc closes, toggle announced with expanded state) | `FabMenu` in `widgets/fab_menu.dart` | m3.material.io/components/fab-menu |
+| Expressive motion springs | `TashilSpring` in `motion.dart` | m3.material.io/styles/motion |
 
 ## Adding a component
 1. Check it exists in M3 (m3.material.io) and in Flutter's Material library.
