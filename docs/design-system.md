@@ -111,6 +111,21 @@ so you can check any component under each condition.
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
 | Receipt | `ReceiptPreview` | 384 dots wide, black on white, later rasterised for the printer |
 
+### Dividers
+Source: **m3.material.io/components/divider/guidelines**. Tokens:
+`TashilDividerInset` in `tokens.dart`. Live: playground tab "الحاويات".
+
+- Full width (`Divider()`): between unrelated sections, and between content
+  and its actions (a group of settings and the next group; cart lines and
+  the total).
+- Inset: between related items of one list. Plain lists:
+  `indent`/`endIndent: TashilDividerInset.both` (16). Lists with a leading
+  icon or image: start at the text (`afterIcon` 56, `afterThumbnail` 88),
+  end 16. A test checks the text really starts there in RTL and LTR.
+- Use them sparingly: rows with the same format (search results, product
+  lists in a scroll) are separated by spacing alone.
+- `VerticalDivider` only on wide layouts (list + details, rail + content).
+
 ### Dialogs
 Source: **m3.material.io/components/dialogs/guidelines**. Code:
 `lib/core/design/widgets/dialogs.dart`. Live: playground tab "التنبيهات".

@@ -40,6 +40,25 @@ abstract final class TashilRadius {
 }
 
 /// Touch and layout sizes tuned for a cashier using the SUNMI V3 one-handed.
+/// Divider indents (m3.material.io/components/divider/guidelines).
+///
+/// * Full width (indent 0): between sections of unrelated content.
+/// * Inset: between related items in a list. Equal on both sides by
+///   default; in a list with leading icons or images the start lines up
+///   with the text, so the divider never cuts under the icon.
+abstract final class TashilDividerInset {
+  /// Plain inset, both sides. Matches the list tile padding.
+  static const both = TashilSpacing.lg;
+
+  /// Start of the text in a [ListTile] with a 24dp leading icon:
+  /// padding 16 + icon 24 + gap 16.
+  static const afterIcon = TashilSpacing.lg + 24 + TashilSpacing.lg;
+
+  /// Start of the text in a row with a 56dp thumbnail (ProductTile).
+  static const afterThumbnail =
+      TashilSpacing.lg + TashilSizes.thumbnail + TashilSpacing.lg;
+}
+
 abstract final class TashilSizes {
   /// M3 minimum touch target.
   static const minTouch = 48.0;

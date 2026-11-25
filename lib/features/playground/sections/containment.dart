@@ -57,7 +57,10 @@ class ContainmentSection extends StatelessWidget {
                   subtitle: Text('رصيد آجل'),
                   trailing: MoneyText(125000),
                 ),
-                const Divider(),
+                const Divider(
+                  indent: TashilDividerInset.afterIcon,
+                  endIndent: TashilDividerInset.both,
+                ),
                 ListTile(
                   leading: const Icon(Icons.local_shipping_outlined),
                   title: const Text('شركة النيل للتوريدات'),
@@ -65,7 +68,10 @@ class ContainmentSection extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_left),
                   onTap: () {},
                 ),
-                const Divider(),
+                const Divider(
+                  indent: TashilDividerInset.afterIcon,
+                  endIndent: TashilDividerInset.both,
+                ),
                 ExpansionTile(
                   leading: Icon(Icons.receipt_long_outlined),
                   title: Text('فاتورة ${Bidi.ltr('SUNMI01-20261125-0042')}'),
@@ -136,10 +142,132 @@ class ContainmentSection extends StatelessWidget {
       ),
       SpecSection(
         title: 'الفواصل',
-        m3: 'Dividers',
-        spec: 'components/divider',
-        children: const [Divider(), SizedBox(height: 8), Divider(indent: 16)],
+        m3: 'Divider',
+        spec: 'components/divider/guidelines',
+        rule:
+            'بعرض كامل بين أقسام مختلفة (أو بين المحتوى والأزرار). Inset بين '
+            'عناصر مرتبطة، ويبدأ عند النص مش تحت الأيقونة. بالراحة: '
+            'القوائم المتشابهة المسافة بتكفي. الرأسي للشاشات الواسعة بس.',
+        children: [
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _GroupTitle('الطباعة'),
+                SwitchListTile(
+                  secondary: const Icon(Icons.print_outlined),
+                  value: true,
+                  onChanged: (_) {},
+                  title: const Text('اطبع الفاتورة تلقائياً'),
+                ),
+                const Divider(
+                  indent: TashilDividerInset.afterIcon,
+                  endIndent: TashilDividerInset.both,
+                ),
+                const ListTile(
+                  leading: Icon(Icons.straighten),
+                  title: Text('عرض الورق'),
+                  trailing: Text('58 مم'),
+                ),
+                // Full width: a different group starts.
+                const Divider(),
+                const _GroupTitle('المزامنة'),
+                const ListTile(
+                  leading: Icon(Icons.sync),
+                  title: Text('آخر مزامنة'),
+                  trailing: Text('منذ 5 دقائق'),
+                ),
+                const Divider(
+                  indent: TashilDividerInset.afterIcon,
+                  endIndent: TashilDividerInset.both,
+                ),
+                const ListTile(
+                  leading: Icon(Icons.wifi_off_outlined),
+                  title: Text('في الانتظار'),
+                  trailing: Text('3 فواتير'),
+                ),
+                // Full width: content above, actions below.
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(TashilSpacing.sm),
+                  child: OverflowBar(
+                    alignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text('زامن الآن'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: TashilSpacing.lg),
+          Text(
+            'رأسي (شاشة واسعة: قائمة + تفاصيل)',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: TashilSpacing.sm),
+          Card.outlined(
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              height: 120,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: const [
+                        ListTile(dense: true, title: Text('فاتورة 1041')),
+                        ListTile(
+                          dense: true,
+                          selected: true,
+                          title: Text('فاتورة 1042'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const VerticalDivider(),
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(TashilSpacing.md),
+                      child: Text(
+                        'فاتورة 1042\n3 أصناف · 245.00 ج.م',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     ]);
   }
+}
+
+class _GroupTitle extends StatelessWidget {
+  const _GroupTitle(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsetsDirectional.fromSTEB(
+      TashilSpacing.lg,
+      TashilSpacing.lg,
+      TashilSpacing.lg,
+      TashilSpacing.xs,
+    ),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(color: Theme.of(context).colorScheme.primary),
+    ),
+  );
 }

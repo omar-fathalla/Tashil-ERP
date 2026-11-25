@@ -60,7 +60,10 @@ class _TashilSectionState extends State<TashilSection> {
                   onTap: () {},
                   onAdd: () {},
                 ),
-                const Divider(),
+                const Divider(
+                  indent: TashilDividerInset.afterThumbnail,
+                  endIndent: TashilDividerInset.both,
+                ),
                 ProductTile(
                   name: 'زيت عباد الشمس 800 مل',
                   pricePiastres: 8500,
@@ -69,7 +72,10 @@ class _TashilSectionState extends State<TashilSection> {
                   unit: 'قطعة',
                   onAdd: () {},
                 ),
-                const Divider(),
+                const Divider(
+                  indent: TashilDividerInset.afterThumbnail,
+                  endIndent: TashilDividerInset.both,
+                ),
                 ProductTile(
                   name: 'لحمة مفرومة',
                   pricePiastres: 42000,
@@ -119,7 +125,12 @@ class _TashilSectionState extends State<TashilSection> {
                     title: 'السلة فاضية',
                     message: 'امسح باركود أو ابحث عن صنف',
                   ),
-                for (final e in _cart.entries) ...[
+                for (final (i, e) in _cart.entries.indexed) ...[
+                  if (i > 0)
+                    const Divider(
+                      indent: TashilDividerInset.both,
+                      endIndent: TashilDividerInset.both,
+                    ),
                   CartLine(
                     name: e.key,
                     unitPricePiastres: e.value.$1,
@@ -128,8 +139,9 @@ class _TashilSectionState extends State<TashilSection> {
                         setState(() => _cart[e.key] = (e.value.$1, q)),
                     onRemove: () => setState(() => _cart.remove(e.key)),
                   ),
-                  const Divider(),
                 ],
+                // Full width: the total is a different section.
+                const Divider(),
                 CheckoutBar(
                   totalPiastres: _total,
                   itemCount: _cart.length,

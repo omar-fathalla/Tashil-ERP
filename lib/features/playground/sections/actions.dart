@@ -331,9 +331,9 @@ class _ExtendedFabDemoState extends State<_ExtendedFabDemo> {
       child: Scaffold(
         body: NotificationListener<UserScrollNotification>(
           onNotification: _onScroll,
-          child: ListView.separated(
+          // Same-format rows: spacing is enough, no dividers (M3).
+          child: ListView.builder(
             itemCount: _items.length,
-            separatorBuilder: (_, _) => const Divider(),
             itemBuilder: (_, i) => ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: Text(_items[i]),
