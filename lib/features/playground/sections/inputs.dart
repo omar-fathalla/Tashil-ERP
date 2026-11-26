@@ -6,6 +6,7 @@ import '../../../core/design/widgets/date_time_fields.dart';
 import '../../../core/design/widgets/menus.dart';
 import 'common.dart';
 import 'scroll_fields_demo.dart';
+import 'search_demo.dart';
 
 class InputsSection extends StatefulWidget {
   const InputsSection({super.key});
@@ -42,14 +43,6 @@ class _InputsSectionState extends State<InputsSection> {
   DateTimeRange? _range;
   TimeOfDay _shiftClose = const TimeOfDay(hour: 23, minute: 0);
   bool _time24 = false;
-
-  static const _products = [
-    'سكر أبيض 1 كجم',
-    'زيت عباد الشمس',
-    'أرز مصري 5 كجم',
-    'شاي ليبتون 100 فتلة',
-    'مكرونة 400 جم',
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -93,23 +86,17 @@ class _InputsSectionState extends State<InputsSection> {
           ),
         ],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'البحث',
-        m3: 'Search bar',
-        spec: 'components/search',
-        rule: 'شريط البحث فوق قوائم الأصناف، وفيه زرار مسح الباركود.',
-        children: [
-          SearchAnchor.bar(
-            barHintText: 'ابحث بالاسم أو الباركود',
-            barTrailing: const [Icon(Icons.qr_code_scanner)],
-            suggestionsBuilder: (context, controller) => [
-              for (final p in _products.where(
-                (p) => p.contains(controller.text),
-              ))
-                ListTile(title: Text(p), onTap: () => controller.closeView(p)),
-            ],
-          ),
-        ],
+        m3: 'Search',
+        spec: 'components/search/guidelines',
+        rule:
+            'شريط البحث فوق المحتوى اللي بيدور فيه، وفيه أيقونة بحث في '
+            'البداية وأيقونتين بالكتير في الآخر (الباركود). قبل الكتابة: '
+            'الأخيرة. وانت بتكتب: نتايج في مجموعات بفواصل ومعاها فلاتر. '
+            'ملء الشاشة على الموبايل، ومنسدل من 600. Enter بيبحث والكلمة '
+            'بتفضل ظاهرة.',
+        children: [SearchDemo()],
       ),
       SpecSection(
         title: 'القوائم',

@@ -86,7 +86,8 @@ so you can check any component under each condition.
 | Related actions or toggles in one row | `ButtonGroup` standard | Pressed button widens, corners morph |
 | Icon-only action | `IconButton` | Always has a `tooltip` |
 | Text input | `TextField` (outlined, from theme) | Numeric keyboard for numbers; errors under the field |
-| Product search | `SearchAnchor.bar` | Barcode scan icon in the bar |
+| Search in a view (products, suppliers) | `TashilSearch` (official `SearchAnchor` + `SearchBar`) | Bar over the content it searches; full screen on compact, docked from 600dp; recent before typing, grouped results + filter chips while typing |
+| Search as a secondary action | `TashilSearch(asIconButton: true)` in the app bar | |
 | Contextual action (print receipt, share) | `ActionChip` with icon (assist) | Starts with a verb; below the main content; `.elevated` only over an image |
 | Filtering lists | `FilterChip` | One set is single- or multi-select, never both. `ChoiceChip` is not an M3 variant: do not use it |
 | Filter that opens options (category ▾) | `MenuFilterChip` | The whole chip opens the menu |
@@ -264,6 +265,37 @@ Sources: **m3.material.io/components/navigation-bar/guidelines**,
 - Not adopted: the horizontal bar items for medium windows, because we
   switch to the rail at 600dp; section headers inside the rail, because
   Flutter's `NavigationRail` has no slot for them yet.
+
+### Search
+Source: **m3.material.io/components/search/guidelines**. Code:
+`lib/core/design/widgets/search.dart`. Live: playground tab "المدخلات",
+section "البحث".
+
+- Entry points: a **search bar** over the content it searches (products
+  list, suppliers); a **search icon button** in the app bar when search
+  is secondary. A search app bar only if search becomes the main, global
+  function.
+- Focused search: **full screen** on compact (SUNMI), **docked** under
+  the bar with a scrim from 600dp. Back releases focus and closes it.
+- Before typing: recent searches under "الأخيرة", each removable.
+- While typing: results in a list, grouped by category with a label for
+  each group ("الأصناف", "الموردين", "العملاء"), groups separated by gaps,
+  leading icon or avatar per item, filter chips at the top to narrow.
+- A status line ("نتايج سريعة: 3", or "مفيش نتايج") is a live region, so
+  screen readers hear that results changed.
+- Enter runs the search (so a keyboard-wedge barcode scanner works: it
+  types and presses Enter). Choosing a result opens it directly. The
+  query stays visible in the bar afterwards, not focused, and goes to
+  recent.
+- Bar: non-functional search icon at the start; one or two trailing icons
+  at most (barcode scan, overflow); a clear button in focused search once
+  something is typed. Hint says what is searched ("ابحث في الأصناف").
+- Colour `surfaceContainerHigh` (Flutter default). Never put the bar on a
+  `surfaceContainer` background: keep surface roles more than one step
+  apart.
+- Scrolling: the bar may scroll away with the list and come back on
+  scroll up (`SliverAppBar(floating: true, snap: true)`), or stay fixed.
+- Predictive back on Android comes from Flutter's route.
 
 ### Menus
 Source: **m3.material.io/components/menus/guidelines**. Code:
