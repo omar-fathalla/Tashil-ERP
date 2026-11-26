@@ -96,6 +96,7 @@ so you can check any component under each condition.
 | Date in a form | `DateField` | Typed in the field (day/month/year, Arabic digits accepted) + calendar button: modal on compact, docked from 600dp |
 | Report period | `ButtonGroup` presets + `showDateRangePicker` (calendar only) for a custom range | Full screen on compact |
 | Time in a form | `ScrollTimePicker` inline | Keyboard toggle always present; 12/24h from the device |
+| Number or unit from a short list (weight, quantity, unit) | `ScrollField` inline + `ScrollFieldInputToggle` next to it | Up to 4 digits; steps for long runs; label each field when side by side; not for time |
 | Time in a dialog | `showTimePicker` (dial) | Dial only in dialogs. Preset times use `ButtonGroup` or a menu |
 | App shell (picks bar or rail by width) | `AdaptiveNavigationScaffold` | Bar below 600dp, collapsed rail from 600, expanded rail from 1200 |
 | Main navigation on the device | `HidingNavigationBar` (official `NavigationBar`) | 3 to 5 destinations, labels always, 64dp, hides on scroll down |
@@ -190,6 +191,36 @@ Sources: **m3.material.io/components/date-pickers/guidelines** and
 - Only use a time picker when any minute can be chosen.
 - `ScrollTimePicker` is M3 Expressive and not in Flutter yet: ours, built
   on `ListWheelScrollView`, to be replaced when Flutter ships it.
+
+### Scroll fields
+Source: **m3.material.io/components/scroll-fields/guidelines** and
+**/specs**. Code: `lib/core/design/widgets/scroll_field.dart`. Live:
+playground tab "المدخلات", section "حقول التمرير".
+
+- For picking a number or a unit from a list: weight (kilos + grams),
+  received quantity + unit. For a time, use the time picker instead.
+- Swipe, or tap the value above or below. The centred value snaps into
+  place and is larger and darker. Arrow keys and screen reader
+  increase/decrease work too.
+- Always give a keyboard option (`ScrollFieldInputToggle`) placed next to
+  the fields. In text mode numbers accept Arabic-Indic digits, strings
+  auto-complete from their first letters, and an invalid value shows an
+  error under the field with an error outline.
+- Sizes (minimum widths): small 1-2 digits 100dp, medium 3 digits 144dp,
+  large 4 digits 186dp. No more than 4 digits; for long runs add steps
+  (grams every 50) or use a text field.
+- When several fields sit side by side, each gets a label above it.
+- Inline is preferred. If there is no room, a non-modal popup; a modal
+  dialog only rarely.
+- Colours from the spec: container `surfaceContainerLowest`, inactive
+  values `outline`, active value `onSurface`, and `primary` for the
+  selected container, the selected value and the cursor. Corners 16dp
+  (never less). Inactive values are cropped to show there is more.
+- Larger windows: pass a taller `height` and wider `width` (or
+  `double.infinity` to fill).
+- Hand-built: Flutter has no scroll field yet. It is composed from the
+  official `ListWheelScrollView` + `FixedExtentScrollPhysics` and
+  `TextField`.
 
 ### Chips
 Source: **m3.material.io/components/chips/guidelines**. Code:
@@ -334,6 +365,7 @@ page, and replace it with Flutter's version once it lands.
 | Loading indicator (morphing shapes, contained) | `LoadingIndicator` in `widgets/loading_indicator.dart`, built on Flutter's official `MaterialShapes` + `MaterialShapeBorder` | m3.material.io/components/loading-indicator |
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
 | Hiding navigation bar, collapsible rail with menu button, modal expanded rail, adaptive shell | `navigation.dart`, composed from the official `NavigationBar`, `NavigationRail`, `Drawer` | m3.material.io/components/navigation-rail/guidelines |
+| Scroll field (snapping wheel, keyboard input, 3 sizes) | `ScrollField` in `widgets/scroll_field.dart`, on the official `ListWheelScrollView` | m3.material.io/components/scroll-fields/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component

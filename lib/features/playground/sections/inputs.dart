@@ -5,6 +5,7 @@ import '../../../core/design/widgets/chips.dart';
 import '../../../core/design/widgets/date_time_fields.dart';
 import '../../../core/design/widgets/menus.dart';
 import 'common.dart';
+import 'scroll_fields_demo.dart';
 
 class InputsSection extends StatefulWidget {
   const InputsSection({super.key});
@@ -665,6 +666,17 @@ class _InputsSectionState extends State<InputsSection> {
             ),
           ]),
         ],
+      ),
+      const SpecSection(
+        title: 'حقول التمرير',
+        m3: 'Scroll fields',
+        spec: 'components/scroll-fields/guidelines',
+        rule:
+            'لاختيار رقم أو وحدة (وزن، كمية، وحدة) من قائمة قصيرة. اسحب أو '
+            'اضغط على الرقم اللي فوق أو تحت. زرار الكيبورد جنبهم دايماً. '
+            'لحد 4 أرقام، وللقوائم الطويلة خطوات (الجرام كل 50). اسم فوق كل '
+            'حقل لما يبقوا جنب بعض. للوقت استخدم منتقي الوقت.',
+        children: [ScrollFieldsDemo()],
       ),
     ]);
   }
