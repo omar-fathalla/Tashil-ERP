@@ -116,6 +116,7 @@ TableGroup core {
   audit_logs
   sync_dead_letters
   document_numbers
+  projection_failures
 }
 
 Table companies {
@@ -913,4 +914,19 @@ Table document_numbers {
   doc_id varchar [not null, note: 'ULID of the document that claimed it first']
   device_id varchar [not null, ref: > devices.id]
   claimed_at timestamp [not null]
+}
+
+Table projection_failures {
+  Note: 'writer: function only. A document the projector could not apply because of a permanent error. Never dropped; the sweeper re-applies it after the fix'
+  id varchar [pk, note: '{collection}_{doc_id}']
+  company_id varchar [not null, ref: > companies.id]
+  device_id varchar [ref: > devices.id]
+  device_seq bigint
+  collection varchar [not null]
+  doc_id varchar [not null]
+  error varchar [not null]
+  attempts int [not null, default: 1]
+  status varchar [not null, note: 'open | resolved']
+  first_failed_at timestamp [not null]
+  resolved_at timestamp
 }

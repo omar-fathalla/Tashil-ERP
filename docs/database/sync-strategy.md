@@ -316,3 +316,84 @@ await outbox.insert(
 - `syncPush` بيرفع batches بالترتيب، والـ projector بيمتص الضغط على `stock_levels` بالإعادة بتاعته، فالكاشير مبيحسش بحاجة.
 
 مصادر القسم ده: [Transaction serializability and isolation](https://firebase.google.com/docs/firestore/transaction-data-contention)، [Transactions and batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions)، [Quotas and limits](https://firebase.google.com/docs/firestore/quotas)، [Retry asynchronous functions](https://firebase.google.com/docs/functions/retries).
+
+---
+
+## 12. حدود إعادة التشغيل في Cloud Functions
+
+### 12.1 الخلاصة
+
+الـ projector (القسم 11.4) بيبقى 2nd-gen `onDocumentCreated` مع `retry: true`، وidempotent بالـ ULID والـ `seq`. **لكن إحنا مبنعتمدش على الـ 24 ساعة بتاعة المنصة لوحدها:** فيه **sweeper** بيشتغل كل شوية ويكمّل أي حاجة اتأخرت، فلو trigger وقع خالص، الحسابات بتتصلّح برضو.
+
+### 12.2 الحقايق (اتأكدت منها من مستندات Firebase)
+
+| الحاجة | المصدر الرسمي | ملاحظة على المقترح |
+|---|---|---|
+| التسليم | "at-least-once"، والحدث الواحد ممكن يشغّل الـ function أكتر من مرة | ✅ |
+| الترتيب | "Ordering is not guaranteed" في Firestore triggers | ✅ وده سبب إن الـ projector عندنا بيرتب بنفسه بالـ `seq` |
+| إعادة التشغيل افتراضيًا | مقفولة، ولازم تتفعّل | ✅ |
+| مدة الإعادة | 2nd gen: 24 ساعة. 1st gen: 7 أيام | ✅ |
+| الانتظار بين المحاولات | أُسّي من 10 لـ 600 ثانية | ✅ |
+| أقصى عدد محاولات | مفيش. والتحكم في العدد أو dead-letter topic بيتطلب Pub/Sub subscription قدام HTTP function | ✅ |
+| السياسة دي على الـ functions القديمة | بتتطبق على الـ functions أول ما تتعمل deploy، ومش بأثر رجعي على اللي اتعملت قبل 20 أبريل 2023 | ✅ تقريبًا |
+| مدة التشغيل | 540 ثانية للـ event-driven، و60 دقيقة لـ HTTP في 2nd gen | ✅ |
+| حجم الحدث | **512 KB لأحداث Eventarc** (2nd gen)، و10 MB للأحداث القديمة | ⚠️ المقترح قال 10 MB. في 2nd gen الحد 512 KB، وده مهم لأن trigger الـ Firestore بيحمل المستند. فاتورة POS عادية أصغر من كده بكتير، لكن إذن استلام كبير لو كان كله في مستند واحد كان ممكن يعدّي الحد، وده سبب تاني إن بنوده subcollection |
+| الذاكرة | الحد الأقصى في 2nd gen **32 GiB** | ⚠️ المقترح قال 16 GiB. مش فارقة معانا، الـ projector محتاج أقل بكتير |
+| الـ concurrency والقيمة الافتراضية لـ timeout | مش مكتوبين في صفحة الحدود | ⚠️ نتأكد منهم وقت الإعداد |
+| حذف الأحداث القديمة | المستندات بتنصح بتجاهل الأحداث الأقدم من وقت معين، والمثال بيستخدم `event.timestamp`. في 2nd gen الـ CloudEvent فيه `event.time` | ⚠️ نتأكد من اسم الحقل حسب نسخة `firebase-functions` |
+| خطأ دائم | ممكن الـ function تفضل في loop من الإعادة لحد ما المدة تخلص | ✅ وده سبب التصنيف تحت |
+
+### 12.3 اللي متفق عليه مع المقترح
+
+- `retry: true` على كل trigger بيعمل projections.
+- **منع التطبيق مرتين** بالـ ULID: عندنا بقى أقوى شوية، لأن الحماية في `devices/{id}/projection/state.applied_seq` جوه نفس الـ transaction اللي بتطبّق، وكمان الأرقام المشتقة ثابتة.
+- **تصنيف الأخطاء:** المؤقت (contention، timeout، `UNAVAILABLE`) → `throw` فالمنصة تعيد. الدائم (بيانات غلط، validation) → يتسجل في `projection_failures` وترجع الـ function نجاح عشان الإعادة تقف.
+- الـ function قصيرة: مخزون، أرصدة، ملخص يومي، وإدخال في طابور ETA. ومفيش API خارجي جواها (ETA ليه worker خاص بيه).
+- مراقبة عدد التشغيلات ونسبة الأخطاء. لو الإعادة كتير، يبقى يا إما contention يا إما bug مش متصنف صح.
+
+### 12.4 اللي اختلفت فيه أو حسّنته
+
+1. **مش بنرمي الأحداث القديمة.** المقترح بيقول تجاهل أي حدث أقدم من ساعة أو اتنين. ده خطر عندنا، لأن الحدث اللي بيترمي معناه إن البيعة **مش هتتخصم من المخزون أبدًا**. فبدل ما نرميه، بنسجله في `projection_failures` ونرجع نجاح. والـ sweeper هو اللي بيكمّله. يعني نفس الهدف (الـ function متفضلش تعيد 24 ساعة على bug)، من غير ما نخسر أي حركة.
+2. **sweeper (scheduled function كل 5 دقايق):**
+   - بيدوّر على الأجهزة اللي عندها `pending_projection` بقاله أكتر من 10 دقايق، ويجيب المستند الناقص بـ `device_seq` ويطبّقه.
+   - بيعيد تشغيل صفوف `projection_failures` بعد ما الـ bug يتصلّح.
+   - بيقارن عدد المستندات اللي اتعملها ACK بالـ `applied_seq` لكل جهاز، ولو فيه فرق قديم بيعمل تنبيه.
+   - كده الـ 24 ساعة بتاعة المنصة مبقتش مهمة: أي حاجة وقعت بتتصلّح في خلال دقايق.
+3. **الـ rebuild:** job يدوي بيعيد بناء `stock_levels` والأرصدة والملخصات لفرع أو لشركة من المستندات من الأول. ده العلاج النهائي لأي bug في الـ projector، ومن غير ما نلمس أي مستند مالي.
+4. **trigger واحد لكل نوع مستند بنفس الـ projector:** المرتجعات والسندات والتحويلات والجرد بيدخلوا نفس طابور الترتيب بتاع الجهاز (نفس `seq`)، عشان الترتيب يفضل صح بين بيعة ومرتجعها.
+5. **`callable` بتاع `syncPush` ملوش إعادة من المنصة** (HTTP وcallable مبيتعادوش)، والإعادة بتاعته هي الـ outbox worker على الجهاز (القسم 11.3). ده مقصود.
+6. **التكلفة:** كل إعادة تشغيل بتتحسب. عشان كده التصنيف الصح للأخطاء الدائمة مهم، والتنبيه لما الإعادات تزيد عن حد معين في الساعة.
+
+### 12.5 شكل الـ projector
+
+```ts
+export const projectDeviceDocument = onDocumentCreated(
+  { document: 'companies/{cid}/{col}/{docId}', retry: true, timeoutSeconds: 60 },
+  async (event) => {
+    const doc = event.data?.data();
+    if (!doc || !PROJECTED_COLLECTIONS.has(event.params.col)) return;
+    try {
+      await db.runTransaction(async (tx) => {
+        const stateRef = db.doc(`companies/${event.params.cid}/devices/${doc.deviceId}/projection/state`);
+        const state = (await tx.get(stateRef)).data() ?? { appliedSeq: 0, pending: [] };
+        if (doc.deviceSeq <= state.appliedSeq) return;                 // already applied
+        if (doc.deviceSeq > state.appliedSeq + 1) {                    // gap: wait for the missing seq
+          tx.set(stateRef, { pending: FieldValue.arrayUnion(doc.deviceSeq) }, { merge: true });
+          return;
+        }
+        // read every stock_levels / balance doc needed for this seq and any pending successors,
+        // then write movements with deterministic ids, increments, and appliedSeq.
+        await applyInOrder(tx, stateRef, state, doc);
+      });
+    } catch (e) {
+      if (isPermanent(e)) {
+        await recordProjectionFailure(event, e);                      // sweeper retries after a fix
+        return;                                                        // success: stop platform retries
+      }
+      throw e;                                                         // transient: platform retries
+    }
+  },
+);
+```
+
+مصادر القسم ده: [Retry asynchronous functions](https://firebase.google.com/docs/functions/retries)، [Quotas and limits (Functions)](https://firebase.google.com/docs/functions/quotas)، [Cloud Firestore triggers](https://firebase.google.com/docs/functions/firestore-events).
