@@ -130,10 +130,7 @@ void main() {
         ),
       );
       expect(ListTileTheme.of(inner).visualDensity?.vertical, -2);
-      expect(
-        Theme.of(inner).inputDecorationTheme.visualDensity?.vertical,
-        -3,
-      );
+      expect(Theme.of(inner).inputDecorationTheme.visualDensity?.vertical, -3);
       expect(Theme.of(inner).visualDensity.vertical, 0);
     });
   });
