@@ -182,7 +182,7 @@ class _TashilSectionState extends State<TashilSection> {
         ],
       ),
       SpecSection(
-        title: 'ReceiptPreview — 58mm',
+        title: 'ReceiptPreview، 58mm',
         spec: 'styles/typography',
         rule:
             'معاينة الإيصال بعرض الطابعة الحقيقي (384 نقطة)، أبيض وأسود '

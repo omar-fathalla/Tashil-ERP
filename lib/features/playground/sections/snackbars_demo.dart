@@ -41,7 +41,7 @@ class _SnackbarsDemoState extends State<SnackbarsDemo> {
   }
 
   void _syncNow(BuildContext c) {
-    showTashilSnackBar(c, 'جاري مزامنة الفواتير...');
+    showTashilSnackBar(c, 'جاري مزامنة الفواتير…');
     _sync?.cancel();
     _sync = Timer(const Duration(milliseconds: 1500), () {
       if (c.mounted) showTashilSnackBar(c, 'اتزامن 12 فاتورة');

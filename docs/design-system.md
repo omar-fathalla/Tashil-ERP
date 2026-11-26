@@ -678,6 +678,70 @@ curve + duration from M3's "Convert springs to curves" table.
   in Arabic.
 - One transition pattern per kind of navigation, everywhere in the app.
 
+### Foundations: accessibility, writing, tokens, input
+From m3.material.io/foundations (principles, designing, writing, building for
+all, content design, alt text, notifications, UX writing style guide,
+customization, design tokens, inputs, selection). Full notes in Arabic: the
+"قواعد M3 الأساسية لتسهيل" doc.
+
+- **Contrast:** small text 4.5:1, large text (14pt bold / 18pt) and graphics
+  3:1. Buttons that sit together in a group need 3:1 container vs background;
+  a lone FAB and disabled states don't.
+- **Targets:** touch 48 dp, pointer 44 dp, 8 dp between targets.
+- **Focus:** default traversal order. Set the initial focus on the main task
+  (POS: the barcode field). A dialog takes focus when it opens and gives it
+  back to the control that opened it.
+- **Keyboard:** Tab between controls, arrows inside a component, Enter runs
+  the main action, Escape closes menus/dialogs/sheets and clears focus but
+  never clears typed text. Custom shortcuts use two or more keys (a single key
+  would fire from a Bluetooth barcode scanner, which types like a keyboard),
+  and are listed in one help place.
+- **Mouse:** same ripple as touch, right click opens the context menu
+  (`ContextMenuRegion`), hover shows states and tooltips, wheel scrolls the
+  list under the pointer.
+- **Selection:** shown with a check icon, checkbox or surface colour, never
+  colour alone (Cairo has no ✓ glyph: use `Icons.check`). Navigation shows one
+  active item. Touch selection mode starts with a long press; long press +
+  drag selects many unless drag already reorders. Admin tables: checkboxes
+  always visible when selecting is the main job, else on hover.
+- **Labels for screen readers:** describe the purpose, not the look ("بحث
+  بالصوت", not "عدسة"). Never put the role in the label ("زرار", "قائمة").
+  Hide decorative images and icons.
+- **Text size:** the UI must work at 200% text. Text and line height grow,
+  padding and spacing don't, controls without text don't. Reflow (stack side
+  by side buttons), scroll vertically only, and in app bars / navigation /
+  fixed tabs keep 1x and show the large label in a long-press tooltip.
+- **Truncation:** wrap important text. An ellipsis needs a way to see the full
+  text (tooltip or a tap that opens it).
+- **Alt text:** under 140 characters, the meaning in this context, no "صورة
+  لـ", no file names, don't repeat the caption. Charts: summary + why it is
+  shown, not every value.
+- **Writing:** say what will happen and how to undo it, calmly. Talk to the
+  user ("فواتيرك"); don't mix "my" and "your"; no company "we" (legal
+  consent like "أنا موافق" is the exception). One register: the simple
+  Egyptian Arabic the app already uses. Spell words out. English UI text is
+  sentence case, never Title Case or ALL CAPS.
+- **Punctuation:** no full stop after a single sentence in labels, tooltips,
+  lists, dialog body or links. "!" only for real achievements. "…" (one
+  character, no space before) only for work in progress, never in buttons or
+  menu items. Parentheses only to define a term. No colon at the end of a
+  heading. No em dash; an unspaced dash for ranges (9–12). Thousands
+  separators from 1,000, none in years, addresses or invoice numbers. Bold
+  for emphasis, not italics.
+- **Notifications:** about the user, timely and actionable, sent only to the
+  people it concerns. Title under 29 characters, body under 40 (80
+  expanded), 1–2 buttons of 1–2 words. Name the weekday ("الخميس"), not
+  "بكرة". No app name, ads, jokes, or emoji on bad news. Never during
+  onboarding or an open sale. Let people turn each kind off in place. Arabic
+  SMS under 134 characters.
+- **Tokens:** reference (`TashilColors`, `TashilSpacing`, `TashilRadius`) →
+  system (`ColorScheme`, `textTheme`, `TashilSemanticColors`) → component
+  (theme data in `app_theme.dart`, constants like `TashilTooltip`). No hex or
+  raw sizes inside components. Contexts (dark, contrast, RTL, language
+  height) change values, never names.
+- **Customization:** dynamic colour is optional and can be applied to some
+  screens only; the Tashil brand theme is always the fallback.
+
 ### Localisation and direction
 - App locale is `ar_EG`, which makes the whole tree RTL and translates built-in
   widgets (date picker, time picker, text selection).
