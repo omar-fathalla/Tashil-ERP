@@ -9,11 +9,12 @@
 //   logical model, not the number of Firestore collections.
 //
 // Keys and idempotency (Firestore has no UNIQUE constraint)
-// - The Firestore document id IS the key. Business documents use an id generated
-//   on the device (UUIDv7 = Drift localUuid). Re-uploading after a network drop
-//   overwrites the same document, so it can never duplicate.
-// - Natural keys that must be unique ARE the document id: product_barcodes/{barcode},
-//   sales/{invoice_no}, sale_returns/{return_no}, eta_documents/{internal_id}.
+// - The Firestore document id IS the idempotency key. Every document created on a
+//   device gets a ULID minted once, inside the local commit, and reused on every
+//   retry. See docs/database/sync-strategy.md section 10.
+// - Human numbers that must be unique (invoice_no, return_no) are guarded by
+//   document_numbers/{number}, claimed in the same server transaction.
+// - Natural keys that are the id: product_barcodes/{barcode}, eta_documents/{internal_id}.
 // - Derived rows use deterministic ids built from their source:
 //   stock_movements/{source_type}_{source_id}_{line_no}
 //   account_entries/{source_type}_{source_id}
@@ -113,6 +114,8 @@ TableGroup core {
   devices
   counters
   audit_logs
+  sync_dead_letters
+  document_numbers
 }
 
 Table companies {
@@ -130,6 +133,7 @@ Table companies {
   created_by varchar [note: 'platform admin uid']
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  max_offline_hours int [not null, default: 24]
 }
 
 Table subscriptions {
@@ -169,6 +173,8 @@ Table branches {
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table roles {
@@ -179,6 +185,8 @@ Table roles {
   is_system boolean [not null, default: false]
   permissions "varchar[]" [not null, note: 'module.action strings, e.g. pos.sell, pos.refund, inventory.adjust, reports.view_profit']
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table members {
@@ -192,6 +200,8 @@ Table members {
   invited_by varchar
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
   indexes {
     (company_id, uid) [pk]
   }
@@ -207,10 +217,15 @@ Table devices {
   invoice_prefix varchar [not null, note: 'unique per company, reserved through counters; never reused, even after reinstall']
   status varchar [not null, note: 'pending | active | revoked. Revoke = disable auth user + revoke refresh tokens + rules deny']
   last_seen_at timestamp
-  sync_cursors json [note: 'per collection: {products: ts, customers: ts, ...}, mirrored from the device for support']
+  sync_cursors json [note: 'per collection: {products: [updated_at, doc_id], ...}, mirrored from the device for support']
   app_version varchar
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revoked_at timestamp [note: 'sales with device_time after this are accepted but flagged']
+  last_acked_seq bigint [note: 'a gap between this and the next pushed seq raises an alert (lost or deleted outbox rows)']
+  last_chain_hash varchar [note: 'hash of the last accepted outbox row; each row carries prev_hash (tamper-evident chain)']
+  last_pull_at timestamp [note: 'device cannot open a new shift after companies.max_offline_hours without a pull']
+  clock_offset_ms bigint [note: 'device clock minus server clock at last sync']
 }
 
 Table counters {
@@ -259,6 +274,8 @@ Table categories {
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table units {
@@ -269,6 +286,8 @@ Table units {
   eta_unit_code varchar [note: 'ETA unit type code, e.g. EA, KGM']
   decimals int [not null, default: 0, note: '0 = whole only, up to 3 (quantities are stored x1000)']
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table products {
@@ -292,6 +311,8 @@ Table products {
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table product_units {
@@ -312,6 +333,8 @@ Table product_barcodes {
   product_id varchar [not null, ref: > products.id]
   product_unit_id varchar [ref: > product_units.id, note: 'null = base unit']
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table product_branch_prices {
@@ -322,6 +345,8 @@ Table product_branch_prices {
   product_unit_id varchar [ref: > product_units.id, note: 'null = base unit']
   selling_price bigint [not null, note: 'piasters, overrides the company price in this branch']
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
   indexes {
     (company_id, branch_id, product_id, product_unit_id) [pk]
   }
@@ -338,6 +363,7 @@ TableGroup inventory_module {
   stock_transfer_items
   stock_counts
   stock_count_items
+  stock_alerts
 }
 
 Table stock_levels {
@@ -347,6 +373,8 @@ Table stock_levels {
   product_id varchar [ref: > products.id]
   quantity_milli bigint [not null]
   updated_at timestamp [not null]
+  revision bigint [not null]
+  last_seq_by_device json [note: '{deviceId: seq} already applied; lets the device rebase its unsynced sales']
   indexes {
     (company_id, branch_id, product_id) [pk]
   }
@@ -382,6 +410,10 @@ Table stock_transfers {
   note varchar
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table stock_transfer_items {
@@ -409,6 +441,10 @@ Table stock_counts {
   reason varchar
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table stock_count_items {
@@ -448,6 +484,8 @@ Table customers {
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table suppliers {
@@ -462,6 +500,8 @@ Table suppliers {
   is_active boolean [not null, default: true]
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 //////////////////////////////////////////////////////////////
@@ -494,6 +534,10 @@ Table purchases {
   posted_at timestamp
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table purchase_items {
@@ -529,15 +573,16 @@ TableGroup pos_module {
 }
 
 Table sales {
-  Note: 'writer: client create only. Immutable: no updates, no status. Doc id = invoice_no. Void and returns are sale_returns documents'
-  invoice_no varchar [pk, note: 'DEVICE-yyyyMMdd-NNNN, document id, unique by construction']
+  Note: 'writer: client create only (through the syncPush function). Immutable: no updates, no status. Doc id = ULID. Void and returns are sale_returns documents'
+  id varchar [pk, note: 'ULID minted on the device at commit = idempotency key']
+  invoice_no varchar [not null, note: '{device prefix}-{yyyyMMdd}-{seq}; seq never resets. Printed number, unique via document_numbers']
   company_id varchar [not null, ref: > companies.id]
   branch_id varchar [not null, ref: > branches.id]
   device_id varchar [not null, ref: > devices.id]
   shift_id varchar [not null, ref: > shifts.id]
   customer_id varchar [ref: > customers.id]
   buyer_snapshot json [note: 'type, name, tax_id, national_id, address at the time of sale (ETA receiver)']
-  date timestamp [not null]
+  device_time timestamp [not null, note: 'business time printed on the receipt; never replaced by server time']
   sub_total bigint [not null]
   discount bigint [not null, default: 0]
   tax bigint [not null, default: 0]
@@ -545,11 +590,15 @@ Table sales {
   cashier_uid varchar [not null]
   returned_total bigint [default: 0, note: 'function only, sum of sale_returns']
   created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table sale_items {
   Note: 'writer: client. Embedded array sales.items[] (a POS receipt stays far below 1 MiB)'
-  invoice_no varchar [ref: > sales.invoice_no]
+  sale_id varchar [ref: > sales.id]
   line_no int
   product_id varchar [not null, ref: > products.id]
   product_name varchar [not null, note: 'snapshot']
@@ -570,44 +619,50 @@ Table sale_items {
   tax bigint [not null]
   total bigint [not null]
   indexes {
-    (invoice_no, line_no) [pk]
+    (sale_id, line_no) [pk]
   }
 }
 
 Table sale_payments {
-  Note: 'writer: client. Embedded array sales.payments[]. method credit makes the function write account_entries/SALE_{invoice_no}'
-  invoice_no varchar [ref: > sales.invoice_no]
+  Note: 'writer: client. Embedded array sales.payments[]. method credit makes the function write account_entries/SALE_{sale_id}'
+  sale_id varchar [ref: > sales.id]
   line_no int
   method varchar [not null, note: 'cash | card | wallet | credit']
   amount bigint [not null]
   reference varchar
   indexes {
-    (invoice_no, line_no) [pk]
+    (sale_id, line_no) [pk]
   }
 }
 
 Table sale_returns {
   Note: 'writer: client create only. Immutable. kind void = full reversal of the whole invoice; return = partial or full return of selected lines'
-  return_no varchar [pk, note: 'DEVICE-yyyyMMdd-R-NNNN, document id']
+  id varchar [pk, note: 'ULID minted on the device = idempotency key']
+  return_no varchar [not null, note: '{device prefix}-{yyyyMMdd}-R-{seq}, same never-reset counter, unique via document_numbers']
   company_id varchar [not null, ref: > companies.id]
   branch_id varchar [not null, ref: > branches.id]
   device_id varchar [not null, ref: > devices.id]
   shift_id varchar [not null, ref: > shifts.id]
-  invoice_no varchar [not null, ref: > sales.invoice_no]
+  sale_id varchar [not null, ref: > sales.id]
   kind varchar [not null, note: 'void | return']
+  device_time timestamp [not null, note: 'business time printed on the return receipt']
   reason varchar
   total bigint [not null]
   refund_method varchar [not null, note: 'cash | card | wallet | credit (reduces customer balance)']
   approved_by varchar [note: 'manager uid when the cashier lacks pos.refund']
   created_by varchar [not null]
   created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table sale_return_items {
   Note: 'writer: client. Embedded array sale_returns.items[]. Function rejects returns above sold minus already returned'
-  return_no varchar [ref: > sale_returns.return_no]
+  return_id varchar [ref: > sale_returns.id]
   line_no int
-  sale_line_no int [not null, note: 'points to sale_items(invoice_no, line_no)']
+  sale_line_no int [not null, note: 'points to sale_items(sale_id, line_no)']
   product_id varchar [not null, ref: > products.id]
   quantity_milli bigint [not null, note: 'in the original sale unit x1000']
   unit_price bigint [not null, note: 'copied from the sale line']
@@ -615,7 +670,7 @@ Table sale_return_items {
   total bigint [not null]
   restock boolean [not null, default: true, note: 'false for damaged goods: no stock movement']
   indexes {
-    (return_no, line_no) [pk]
+    (return_id, line_no) [pk]
   }
 }
 
@@ -644,6 +699,11 @@ Table shifts {
   status varchar [not null, note: 'open | closed']
   created_at timestamp [not null]
   updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+  sync_state varchar [not null, default: 'synced', note: 'synced | pending_sync (closed offline)']
 }
 
 Table cash_movements {
@@ -656,6 +716,10 @@ Table cash_movements {
   reason varchar [not null]
   created_by varchar [not null]
   created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 //////////////////////////////////////////////////////////////
@@ -683,6 +747,10 @@ Table vouchers {
   device_id varchar [ref: > devices.id]
   created_by varchar [not null]
   created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 Table account_entries {
@@ -713,6 +781,8 @@ Table expense_categories {
   company_id varchar [not null, ref: > companies.id]
   name varchar [not null]
   updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
 }
 
 Table expenses {
@@ -729,6 +799,10 @@ Table expenses {
   void_of_id varchar [ref: > expenses.id]
   created_by varchar [not null]
   created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
 }
 
 //////////////////////////////////////////////////////////////
@@ -754,8 +828,8 @@ Table eta_documents {
   Note: 'writer: function only. Doc id = internal_id'
   internal_id varchar [pk, note: 'invoice_no or return_no']
   company_id varchar [not null, ref: > companies.id]
-  invoice_no varchar [ref: > sales.invoice_no]
-  return_no varchar [ref: > sale_returns.return_no]
+  sale_id varchar [ref: > sales.id]
+  sale_return_id varchar [ref: > sale_returns.id]
   doc_type varchar [not null, note: 'receipt | return_receipt | invoice | credit_note']
   original_eta_uuid varchar [note: 'UUID of the original document, required for return receipts / credit notes']
   eta_uuid varchar
@@ -793,4 +867,48 @@ Table daily_summaries {
   indexes {
     (company_id, branch_id, day) [pk]
   }
+}
+
+//////////////////////////////////////////////////////////////
+// SYNC SUPPORT (see docs/database/sync-strategy.md)
+//////////////////////////////////////////////////////////////
+
+Table sync_dead_letters {
+  Note: 'writer: function only. A document that arrived with an existing id but a different payload_hash. History is never overwritten; support resolves it'
+  id varchar [pk, note: '{device_id}_{device_seq}']
+  company_id varchar [not null, ref: > companies.id]
+  device_id varchar [not null, ref: > devices.id]
+  device_seq bigint [not null]
+  collection varchar [not null]
+  doc_id varchar [not null]
+  stored_hash varchar [not null]
+  incoming_hash varchar [not null]
+  incoming_body json [not null]
+  status varchar [not null, note: 'open | resolved']
+  received_at timestamp [not null]
+}
+
+Table stock_alerts {
+  Note: 'writer: function only. Raised instead of rejecting a sale: negative stock, oversell, short transfer receipt'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  product_id varchar [not null, ref: > products.id]
+  kind varchar [not null, note: 'negative_stock | short_receipt | count_difference']
+  quantity_milli bigint [not null, note: 'balance after the movement, or the difference']
+  source_type varchar
+  source_id varchar
+  status varchar [not null, note: 'open | acknowledged']
+  acknowledged_by varchar
+  created_at timestamp [not null]
+}
+
+Table document_numbers {
+  Note: 'writer: function only. Uniqueness guard for printed numbers, claimed in the same transaction that creates the document. A second claim by another document is flagged duplicate_number, never rejected (the receipt is already printed)'
+  number varchar [pk, note: 'document id, e.g. invoice_no or return_no']
+  company_id varchar [not null, ref: > companies.id]
+  doc_type varchar [not null, note: 'sale | sale_return']
+  doc_id varchar [not null, note: 'ULID of the document that claimed it first']
+  device_id varchar [not null, ref: > devices.id]
+  claimed_at timestamp [not null]
 }

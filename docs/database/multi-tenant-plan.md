@@ -1,7 +1,7 @@
 # خطة قاعدة البيانات متعددة الشركات (Multi-tenant) — Tashil ERP
 
 > الحالة: مقترح للمراجعة · التاريخ: 2026-11-25 · المراجعة الثانية: 2026-11-26 (القسم 9)
-> الملفات المرتبطة: [`tashil-erp.dbml`](./tashil-erp.dbml) (مخطط ER كامل، يتفتح في [dbdiagram.io](https://dbdiagram.io) من Import > DBML)
+> الملفات المرتبطة: [`sync-strategy.md`](./sync-strategy.md) (استراتيجية المزامنة) · [`tashil-erp.dbml`](./tashil-erp.dbml) (مخطط ER كامل، يتفتح في [dbdiagram.io](https://dbdiagram.io) من Import > DBML)
 
 ## 0. الخلاصة في سطور
 
@@ -113,8 +113,8 @@ Identity Platform فيه "tenants" بمعنى **مجموعات مستخدمين 
   /stockTransfers/{id} (items[] جواه)  /stockCounts/{id}/items/{productId}
   /customers/{id}  /suppliers/{id}                                            ← Customers & Suppliers
   /purchases/{id}/items/{lineNo}                                              ← Receiving
-  /sales/{invoiceNo} (items[] + payments[] جواه)                               ← POS
-  /saleReturns/{returnNo} (items[] جواه)
+  /sales/{ulid} (items[] + payments[] جواه)                                   ← POS
+  /saleReturns/{ulid} (items[] جواه)  /documentNumbers/{invoiceNo}
   /shifts/{id}  /cashMovements/{id}                                           ← Cash drawer & Shifts
   /vouchers/{id}  /accountEntries/{sourceType_sourceId}                       ← Credit accounts
   /expenseCategories/{id}  /expenses/{id}                                     ← Expenses
@@ -130,15 +130,14 @@ Identity Platform فيه "tenants" بمعنى **مجموعات مستخدمين 
 
 | المستند | رقم المستند (document id) | ليه |
 |---|---|---|
-| أي مستند بيعمله الجهاز (عميل، وردية، سند، مصروف…) | `localUuid` (UUIDv7) اللي اتعمل على الجهاز | إعادة الرفع بعد ما النت يقطع بتكتب على نفس المستند |
-| فاتورة البيع | `invoiceNo` = `DEVICE-yyyyMMdd-NNNN` | رقم الفاتورة مستحيل يتكرر، والـ prefix بتاع الجهاز بيتحجز من `counters` ومبيرجعش تاني حتى لو التطبيق اتمسح |
-| المرتجع | `returnNo` = `DEVICE-yyyyMMdd-R-NNNN` | نفس الفكرة |
+| أي مستند بيعمله الجهاز (فاتورة، مرتجع، وردية، سند، مصروف…) | ULID بيتولّد مرة واحدة على الجهاز وقت الـ commit | إعادة الرفع بعد ما النت يقطع بتلاقي نفس المستند |
+| رقم الفاتورة أو المرتجع المطبوع | `documentNumbers/{invoiceNo}` | بيتحجز في نفس transaction الرفع، والعداد بتاع الجهاز مبيرجعش لصفر |
 | الباركود | الباركود نفسه | الباركود مستحيل يبقى على منتجين |
 | حركة المخزون | `{sourceType}_{sourceId}_{lineNo}` | الحركة مشتقة من سطر مستند، فإعادة الكتابة مبتعملش حركة تانية |
 | قيد الحساب | `{sourceType}_{sourceId}` | الفاتورة أو السند يتقيد مرة واحدة بس، حتى لو الـ Function اشتغلت مرتين |
 | مستند الضرائب | `internalId` (رقم الفاتورة أو المرتجع) | إرسال واحد لكل مستند |
 
-الـ Rules بتسمح بـ `create` بس على المستندات المالية، فلو مستند موجود فعلًا، إعادة الرفع بتترفض بدل ما تعدّل. والـ outbox بيعتبر الرفض ده نجاح لأن المستند وصل قبل كده.
+الرفع بيتم عن طريق الـ Function `syncPush`: لو المستند موجود بنفس الـ hash بترد ACK، ولو موجود بـ hash مختلف بيروح dead-letter. التفاصيل كاملة في [`sync-strategy.md`](./sync-strategy.md).
 
 ### 3.2 قواعد التصميم
 
@@ -188,7 +187,9 @@ difference    = counted_cash - expected_cash
 
 ### 3.7 المزامنة (Drift ⇄ Firestore)
 
-- **Push:** الـ SyncOutbox بيبعت batches (لحد 500 عملية). الفاتورة وحركات المخزون بتاعتها في نفس الـ batch. الـ Rules بتتأكد إن `cid` مطابق للتوكن، وإن الموديول مفعّل، وإن الجهاز لسه `active`.
+> التفاصيل الكاملة للمزامنة (الـ outbox، الـ hash، الـ dead-letter، المخزون offline، الـ tombstones) في [`sync-strategy.md`](./sync-strategy.md)، وهي المرجع لو فيه اختلاف مع القسم ده.
+
+- **Push:** الـ outbox بيرفع بالترتيب عن طريق الـ callable Function `syncPush`، والـ Function هي اللي بتكتب المستند وحركات المخزون في نفس الـ transaction. الأجهزة مبتكتبش في Firestore مباشرة.
 - **Pull:** لكل collection فيه **cursor منفصل**: `where updatedAt > cursor[collection] order by updatedAt limit 500`. الـ cursors محفوظة في Drift، ومنها نسخة في `devices/{id}.syncCursors` للدعم الفني. وبما إن `updatedAt` بقى إجباري على كل الماستر، الـ cursor بقى موثوق. الجهاز بيسحب بيانات فرعه بس (`where branchId == bid`) للجداول الكبيرة.
 - **التعارض:** الكتالوج (منتجات وأسعار) = last-writer-wins بالـ `updatedAt`. المستندات المالية والمخزنية create-only فمفيش تعارض.
 - إحنا **مش محتاجين** Firestore offline cache على الـ POS لأن Drift هو مصدر الحقيقة المحلي. الـ Angular dashboard بيستخدم Firestore realtime عادي.
@@ -221,6 +222,8 @@ difference    = counted_cash - expected_cash
 4. التطبيق بيخفي الشاشات، والـ Rules بتمنع الكتابة في collections الموديول المقفول.
 
 ### 4.4 Security Rules (مسودة)
+
+> بعد استراتيجية المزامنة، الكتابة كلها بقت عن طريق `syncPush` و`upsertMaster`، فالـ Rules للـ clients بقت قراءة بس. المسودة تحت بتوضح فحوصات القراءة والعزل، والـ create بتاع المبيعات فيها للتوضيح بس.
 
 ```js
 rules_version = '2';
@@ -470,7 +473,8 @@ erDiagram
     SALE_RETURNS ||--o| ETA_DOCUMENTS : "return receipt"
 
     SALES {
-        string invoice_no PK "doc id"
+        string id PK "ULID"
+        string invoice_no "printed"
         string shift_id FK
         json buyer_snapshot
         int total
@@ -490,8 +494,8 @@ erDiagram
         int amount
     }
     SALE_RETURNS {
-        string return_no PK "doc id"
-        string invoice_no FK
+        string id PK "ULID"
+        string sale_id FK
         string kind "void or return"
         string refund_method
     }

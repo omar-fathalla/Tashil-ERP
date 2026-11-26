@@ -42,4 +42,4 @@ flutter run
 
 ## Docs
 
-- [Multi-tenant database plan](docs/database/multi-tenant-plan.md) · [ER diagram (DBML)](docs/database/tashil-erp.dbml)
+- [Multi-tenant database plan](docs/database/multi-tenant-plan.md) · [Sync strategy](docs/database/sync-strategy.md) · [ER diagram (DBML)](docs/database/tashil-erp.dbml)
