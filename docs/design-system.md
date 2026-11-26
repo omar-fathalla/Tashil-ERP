@@ -205,9 +205,25 @@ design, and the breakpoint pages for the numbers). Code:
   `TashilBreakpoint.of(context)`; design for breakpoints, never for a
   device, because rotation, split screen and resizing move the window
   between them. Height breakpoints are rarely needed (content scrolls).
-- **Layout scaffold**: bars (app bar, navigation bar) frame the page, rails
-  hold the navigation rail, toolbars and the FAB, and **all content is in a
-  pane**. In Arabic the navigation and the first pane are on the right.
+- **Layout scaffold** (m3.material.io/foundations/layout/scaffold: overview,
+  bars, rails, panes): every adaptive layout is bars, rails and panes. In
+  Arabic the navigation and the first pane are on the right.
+  - **Bars** frame the page and can span one pane or the whole window. The
+    app bar sits at the top with a title and **1–2 essential actions**
+    (`AdaptiveNavigationScaffold.actions`, asserted); the navigation bar at
+    the bottom switches 3–5 views on compact and medium. Bars sit next to
+    the safety regions (status bar, gesture bar), which never hold primary
+    content.
+  - **Rails** are the next level after bars: the space around panes, or
+    floating above them. Compact: a toolbar, chat input or FAB floats in
+    the bottom rail above the navigation bar. Larger screens: the leading
+    rail holds the navigation rail, the trailing rail holds supporting
+    controls for the pane (a vertical toolbar).
+    `AdaptiveNavigationScaffold.toolbar` places a `TashilToolbar`
+    (hand-built M3 Expressive floating toolbar; Flutter has none)
+    horizontally above the bar on compact and vertically in an 88dp
+    trailing rail from medium.
+  - **Panes** hold all content (next bullet).
 - **Panes** (`PaneLayout`): one pane on compact and medium, two from
   expanded, a third (standard side sheet, max 400dp) only on extra-large;
   never more than three. Medium may use two 50/50 panes only for
@@ -217,6 +233,32 @@ design, and the breakpoint pages for the numbers). Code:
   and extra-large. Margins 16dp compact, 24dp from medium; 24dp spacer
   between panes. On one-pane breakpoints the open item replaces the list
   and the caller handles back.
+- **Pane types**: fixed (width does not change) or flexible (grows and
+  shrinks); every layout has at least one flexible pane. Permanent or
+  temporary (dismissible, like a side sheet). `PaneSplit.fixedFlexible`
+  (list-detail), `flexibleFixed` (supporting pane at the end), `split`
+  (50/50 with the spacer centred in the **window**: the navigation rail
+  only shrinks the first pane; `NavigationInset` from the scaffold).
+- **Resizing**: the drag handle snaps to 360dp, 412dp (and the centre of a
+  split) when released within 32dp; a tap, Enter or Space toggles one and
+  two panes. **Persistent** resizing (default): keep a
+  `PaneLayoutController` per screen and save its `sizedWidth` and
+  `collapse` with the user's settings; a layout collapsed to one pane stays
+  so on every breakpoint. **Temporary** (`PaneResizing.temporary`, for
+  supporting panes): back to the default when the pane closes.
+- **Showing several panes**: co-planar (side by side; persistent tools),
+  floating (above others, like a dialog; temporary tasks float at every
+  breakpoint, scrim optional on large screens), docked (pinned to an edge,
+  like a bottom sheet). Adapt with **show and hide**, **levitate** (a
+  docked pane becomes floating or co-planar on medium and expanded, and
+  co-planar on large: our bottom sheet becomes a side sheet from 840dp)
+  and **reflow** (`PaneLayout(reflow: true)` stacks the supporting pane
+  under the first when there is room for one pane only).
+- **Pane accessibility**: focus order follows the panes' visual order.
+  A modal floating pane blocks what is behind it, takes focus on open and
+  gives it back to its trigger on close (to the next logical element if it
+  opened by itself), and closes when the person uses something behind it.
+  A non-modal one lets focus move in and out and sits in reading order.
 - **Containment**: panes blend with the background by default (implicit
   grouping); `contained: true` gives them a container colour and rounded
   corners (explicit grouping).

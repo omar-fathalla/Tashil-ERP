@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../layout.dart';
 import '../motion.dart';
 import '../tokens.dart';
+import 'toolbar.dart';
 
 /// Navigation that follows the M3 Expressive pages
 /// (m3.material.io/components/navigation-bar, navigation-rail,
@@ -261,7 +263,10 @@ class AdaptiveNavigationScaffold extends StatefulWidget {
     required this.body,
     this.fab,
     this.barOnMedium = false,
-  }) : assert(primary.length >= 3 && primary.length <= 5);
+    this.actions = const [],
+    this.toolbar = const [],
+  }) : assert(primary.length >= 3 && primary.length <= 5),
+       assert(actions.length <= 2, 'M3 bars: 1 to 2 essential actions');
 
   final String title;
 
@@ -277,6 +282,18 @@ class AdaptiveNavigationScaffold extends StatefulWidget {
 
   /// Medium screen showing two panes: navigation bar instead of the rail.
   final bool barOnMedium;
+
+  /// App bar actions: at most two essential ones (search, scan). The rest
+  /// go in an overflow menu or the [toolbar].
+  final List<Widget> actions;
+
+  /// Actions for this screen in the rail region (M3 scaffold > rails): a
+  /// horizontal [TashilToolbar] floating above the navigation bar on
+  /// compact, a vertical one in the trailing rail from medium. Empty = none.
+  final List<ToolbarAction> toolbar;
+
+  /// Width of the trailing rail region that holds the vertical toolbar.
+  static const trailingRailWidth = 88.0;
 
   /// From this width (the large breakpoint) the rail starts expanded.
   static const expandedFrom = 1200.0;
@@ -308,6 +325,7 @@ class _AdaptiveNavigationScaffoldState
         }
         final expanded =
             _expanded ?? c.maxWidth >= AdaptiveNavigationScaffold.expandedFrom;
+        const expandedWidth = 240.0;
         return Scaffold(
           body: Row(
             children: [
@@ -317,15 +335,33 @@ class _AdaptiveNavigationScaffoldState
                 selectedIndex: w.selectedIndex,
                 onDestinationSelected: w.onDestinationSelected,
                 expanded: expanded,
+                expandedWidth: expandedWidth,
                 onMenu: () => setState(() => _expanded = !expanded),
                 fab: w.fab,
               ),
               Expanded(
                 child: Scaffold(
-                  appBar: AppBar(title: Text(w.title)),
-                  body: w.body,
+                  appBar: AppBar(title: Text(w.title), actions: w.actions),
+                  // Panes need the rail width to keep a split layout's
+                  // spacer centred in the window.
+                  body: NavigationInset(
+                    width: expanded
+                        ? expandedWidth
+                        : TashilNavigationRail.collapsedWidth,
+                    child: w.body,
+                  ),
                 ),
               ),
+              if (w.toolbar.isNotEmpty)
+                SizedBox(
+                  width: AdaptiveNavigationScaffold.trailingRailWidth,
+                  child: Center(
+                    child: TashilToolbar(
+                      axis: Axis.vertical,
+                      actions: w.toolbar,
+                    ),
+                  ),
+                ),
             ],
           ),
         );
@@ -338,7 +374,7 @@ class _AdaptiveNavigationScaffoldState
     final f = w.fab;
     final inBar = w.selectedIndex < w.primary.length;
     return Scaffold(
-      appBar: AppBar(title: Text(w.title)),
+      appBar: AppBar(title: Text(w.title), actions: w.actions),
       drawer: w.secondary.isEmpty
           ? null
           : Builder(
@@ -349,7 +385,22 @@ class _AdaptiveNavigationScaffoldState
                 onDestinationSelected: w.onDestinationSelected,
               ),
             ),
-      body: _bar.listener(child: w.body),
+      body: _bar.listener(
+        child: w.toolbar.isEmpty
+            ? w.body
+            : Stack(
+                children: [
+                  Positioned.fill(child: w.body),
+                  // Bottom rail region: floats above the navigation bar.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: TashilSpacing.lg,
+                    child: Center(child: TashilToolbar(actions: w.toolbar)),
+                  ),
+                ],
+              ),
+      ),
       floatingActionButton: f == null
           ? null
           : FloatingActionButton(

@@ -4,6 +4,7 @@ import '../../../core/design/layout.dart';
 import '../../../core/design/money.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/button_group.dart';
+import '../../../core/design/widgets/toolbar.dart';
 
 /// Preview of the M3 layout scaffold: pick a breakpoint and see the same
 /// invoices screen as a scaled-down window of that width.
@@ -26,6 +27,17 @@ class _LayoutDemoState extends State<LayoutDemo> {
   TashilBreakpoint _b = TashilBreakpoint.expanded;
   int? _open = 0;
   bool _contained = false;
+  PaneSplit _split = PaneSplit.fixedFlexible;
+
+  /// Persistent resizing: the width you drag to stays when you switch
+  /// breakpoints.
+  final _panes = PaneLayoutController();
+
+  @override
+  void dispose() {
+    _panes.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +46,7 @@ class _LayoutDemoState extends State<LayoutDemo> {
     final window = TashilBreakpoint.of(context);
     final b = _b;
     final width = _widths[b]!;
+    final compact = b == TashilBreakpoint.compact;
     final panes = switch (b) {
       TashilBreakpoint.compact || TashilBreakpoint.medium => 1,
       TashilBreakpoint.extraLarge => 3,
@@ -67,6 +80,29 @@ class _LayoutDemoState extends State<LayoutDemo> {
           '${b.fixedPaneWidth == null ? '' : ' · القايمة ${b.fixedPaneWidth!.round()}dp'}',
           style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
+        const SizedBox(height: TashilSpacing.sm),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ButtonGroup<PaneSplit>(
+            variant: ButtonGroupVariant.connected,
+            items: const [
+              ButtonGroupItem(
+                value: PaneSplit.fixedFlexible,
+                label: 'ثابت + مرن',
+              ),
+              ButtonGroupItem(
+                value: PaneSplit.flexibleFixed,
+                label: 'مرن + ثابت',
+              ),
+              ButtonGroupItem(value: PaneSplit.split, label: 'نص بنص'),
+            ],
+            selected: {_split},
+            onSelectionChanged: (s) => setState(() {
+              _split = s.first;
+              _panes.reset();
+            }),
+          ),
+        ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('أجزاء بخلفية (تجميع صريح)'),
@@ -93,11 +129,15 @@ class _LayoutDemoState extends State<LayoutDemo> {
                     child: Stack(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: TashilSpacing.lg,
+                          // Trailing rail region for the vertical toolbar.
+                          padding: EdgeInsetsDirectional.only(
+                            top: TashilSpacing.lg,
+                            bottom: TashilSpacing.lg,
+                            end: compact ? 0 : _rail,
                           ),
                           child: PaneLayout(
-                            key: ValueKey(b),
+                            controller: _panes,
+                            split: _split,
                             breakpoint: b,
                             contained: _contained,
                             showSecond: _open != null,
@@ -119,8 +159,30 @@ class _LayoutDemoState extends State<LayoutDemo> {
                             third: const _Filters(),
                           ),
                         ),
+                        if (compact)
+                          const Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: TashilSpacing.lg,
+                            child: Center(
+                              child: TashilToolbar(actions: _tools),
+                            ),
+                          )
+                        else
+                          const PositionedDirectional(
+                            end: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: _rail,
+                            child: Center(
+                              child: TashilToolbar(
+                                axis: Axis.vertical,
+                                actions: _tools,
+                              ),
+                            ),
+                          ),
                         PositionedDirectional(
-                          end: b.margin,
+                          end: b.margin + (compact ? 0 : _rail),
                           bottom: TashilSpacing.lg,
                           child: AdaptiveFab(
                             breakpoint: b,
@@ -141,6 +203,16 @@ class _LayoutDemoState extends State<LayoutDemo> {
     );
   }
 }
+
+const _rail = 88.0;
+
+const _tools = [
+  ToolbarAction(icon: Icons.print_outlined, label: 'طباعة', onPressed: _noop),
+  ToolbarAction(icon: Icons.share_outlined, label: 'مشاركة', onPressed: _noop),
+  ToolbarAction(icon: Icons.filter_list, label: 'تصفية', onPressed: _noop),
+];
+
+void _noop() {}
 
 const _customers = ['محل الأمل', 'سوبر ماركت النور', 'عم سيد', 'بقالة الخير'];
 

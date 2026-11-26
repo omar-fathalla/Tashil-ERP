@@ -4,6 +4,7 @@ import 'package:tashil_erp/core/design/app_theme.dart';
 import 'package:tashil_erp/core/design/layout.dart';
 import 'package:tashil_erp/core/design/tokens.dart';
 import 'package:tashil_erp/core/design/widgets/navigation.dart';
+import 'package:tashil_erp/core/design/widgets/toolbar.dart';
 
 class _Pane extends StatelessWidget {
   const _Pane(this.name);
@@ -249,5 +250,188 @@ void main() {
     expect(find.byType(NavigationBar), findsOneWidget);
     await _app(t, 1000, nav(bar: true));
     expect(find.byType(NavigationRail), findsOneWidget);
+  });
+
+  testWidgets('split: spacer centred in the window even with a rail', (
+    t,
+  ) async {
+    await _app(
+      t,
+      1000,
+      const NavigationInset(
+        width: 96,
+        child: PaneLayout(
+          first: _first,
+          second: _second,
+          split: PaneSplit.split,
+        ),
+      ),
+    );
+    // Window = 96 rail + 1000. Half of it minus the rail, margin, half spacer.
+    expect(_rect(t, 'القايمة').width, closeTo((1096 / 2) - 96 - 24 - 12, 0.5));
+  });
+
+  testWidgets('flexible-fixed: the supporting pane at the end is 360dp', (
+    t,
+  ) async {
+    await _app(
+      t,
+      1000,
+      const PaneLayout(
+        first: _first,
+        second: _second,
+        split: PaneSplit.flexibleFixed,
+      ),
+    );
+    expect(_rect(t, 'التفاصيل').width, 360);
+    expect(_rect(t, 'التفاصيل').left, 24);
+  });
+
+  testWidgets('released handle snaps to 412dp', (t) async {
+    await _app(t, 1000, const PaneLayout(first: _first, second: _second));
+    // 20dp slop + 40dp: 400dp, within 32dp of 412.
+    await t.drag(find.byType(PaneDragHandle), const Offset(-60, 0));
+    await t.pumpAndSettle();
+    expect(_rect(t, 'القايمة').width, 412);
+  });
+
+  testWidgets('tap on the handle toggles one and two panes', (t) async {
+    await _app(t, 1000, const PaneLayout(first: _first, second: _second));
+    await t.tap(find.byType(PaneDragHandle));
+    await t.pumpAndSettle();
+    expect(find.text('القايمة'), findsNothing);
+    expect(find.text('التفاصيل'), findsOneWidget);
+    await t.tap(find.byType(PaneDragHandle));
+    await t.pumpAndSettle();
+    expect(find.text('القايمة'), findsOneWidget);
+  });
+
+  testWidgets('persistent: width and collapse survive breakpoint changes', (
+    t,
+  ) async {
+    final c = PaneLayoutController();
+    Widget layout() =>
+        PaneLayout(controller: c, first: _first, second: _second);
+    await _app(t, 1000, layout());
+    c.resize(412);
+    await t.pump();
+    await _app(t, 1300, layout());
+    expect(_rect(t, 'القايمة').width, 412);
+
+    c.collapseTo(PaneCollapse.secondOnly);
+    await _app(t, 700, layout());
+    await _app(t, 1000, layout());
+    expect(find.text('القايمة'), findsNothing, reason: 'stays collapsed');
+    expect(PaneLayoutController(sizedWidth: 360).sizedWidth, 360);
+  });
+
+  testWidgets('temporary: back to the default width after the pane closes', (
+    t,
+  ) async {
+    final c = PaneLayoutController();
+    Widget layout(bool open) => PaneLayout(
+      controller: c,
+      resizing: PaneResizing.temporary,
+      first: _first,
+      second: open ? _second : null,
+      placeholder: const _Pane('فاضي'),
+    );
+    await _app(t, 1000, layout(true));
+    c.resize(500);
+    await t.pump();
+    expect(_rect(t, 'القايمة').width, 500);
+    await _app(t, 1000, layout(false));
+    await t.pump();
+    await _app(t, 1000, layout(true));
+    expect(_rect(t, 'القايمة').width, 360);
+  });
+
+  testWidgets('reflow: compact stacks the supporting pane under the first', (
+    t,
+  ) async {
+    await _app(
+      t,
+      360,
+      const PaneLayout(first: _first, second: _second, reflow: true),
+    );
+    final a = _rect(t, 'القايمة');
+    final b = _rect(t, 'التفاصيل');
+    expect(b.top, greaterThan(a.bottom));
+    expect(b.top - a.bottom, 24);
+  });
+
+  group('scaffold: bars and rails', () {
+    const dests = [
+      TashilDestination(
+        icon: Icons.point_of_sale,
+        selectedIcon: Icons.point_of_sale,
+        label: 'البيع',
+      ),
+      TashilDestination(
+        icon: Icons.inventory_2_outlined,
+        selectedIcon: Icons.inventory_2,
+        label: 'المخزون',
+      ),
+      TashilDestination(
+        icon: Icons.bar_chart,
+        selectedIcon: Icons.bar_chart,
+        label: 'التقارير',
+      ),
+    ];
+    Widget scaffold() => AdaptiveNavigationScaffold(
+      title: 'الفواتير',
+      primary: dests,
+      selectedIndex: 0,
+      onDestinationSelected: (_) {},
+      actions: [
+        IconButton(
+          tooltip: 'بحث',
+          onPressed: () {},
+          icon: const Icon(Icons.search),
+        ),
+      ],
+      toolbar: [
+        ToolbarAction(icon: Icons.print, label: 'طباعة', onPressed: () {}),
+        ToolbarAction(icon: Icons.share, label: 'مشاركة', onPressed: () {}),
+      ],
+      body: Builder(
+        builder: (c) => Text('inset ${NavigationInset.of(c).round()}'),
+      ),
+    );
+
+    testWidgets('compact: horizontal toolbar above the navigation bar', (
+      t,
+    ) async {
+      await _app(t, 360, scaffold());
+      final bar = t.getRect(find.byType(NavigationBar));
+      final tb = t.getRect(find.byType(TashilToolbar));
+      expect(tb.bottom, lessThan(bar.top));
+      expect(tb.width, greaterThan(tb.height));
+      expect(find.byTooltip('بحث'), findsOneWidget);
+    });
+
+    testWidgets('medium and up: vertical toolbar in the trailing rail, '
+        'panes know the rail width', (t) async {
+      await _app(t, 1000, scaffold());
+      final tb = t.getRect(find.byType(TashilToolbar));
+      expect(tb.height, greaterThan(tb.width));
+      // RTL: trailing side is the left edge.
+      expect(tb.left, lessThan(AdaptiveNavigationScaffold.trailingRailWidth));
+      expect(find.text('inset 96'), findsOneWidget);
+    });
+
+    test('app bar takes at most two actions', () {
+      expect(
+        () => AdaptiveNavigationScaffold(
+          title: 'x',
+          primary: dests,
+          selectedIndex: 0,
+          onDestinationSelected: (_) {},
+          actions: const [SizedBox(), SizedBox(), SizedBox()],
+          body: const SizedBox(),
+        ),
+        throwsAssertionError,
+      );
+    });
   });
 }
