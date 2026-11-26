@@ -85,7 +85,7 @@ so you can check any component under each condition.
 | 2-5 exclusive options (payment method, report period) | `ButtonGroup` connected | Replaces `SegmentedButton`, which M3 no longer recommends. Do not use `SegmentedButton` |
 | Related actions or toggles in one row | `ButtonGroup` standard | Pressed button widens, corners morph |
 | Icon-only action | `IconButton` | Always has a `tooltip` |
-| Text input | `TextField` (outlined, from theme) | Numeric keyboard for numbers; errors under the field |
+| Text input | `TashilTextField` (official `TextField`, outlined from the theme) inside a `FormColumn` | Label always; required `*` + one `RequiredFieldsNote`; error replaces supporting text, with an error icon; numeric keyboard for numbers |
 | Search in a view (products, suppliers) | `TashilSearch` (official `SearchAnchor` + `SearchBar`) | Bar over the content it searches; full screen on compact, docked from 600dp; recent before typing, grouped results + filter chips while typing |
 | Search as a secondary action | `TashilSearch(asIconButton: true)` in the app bar | |
 | Contextual action (print receipt, share) | `ActionChip` with icon (assist) | Starts with a verb; below the main content; `.elevated` only over an image |
@@ -179,6 +179,41 @@ Source: **m3.material.io/components/dialogs/guidelines**. Code:
   Field errors inline; a dialog only when saving fails. Closing with edits
   asks "تتجاهل التعديلات؟".
 - Long content scrolls inside; title and buttons stay fixed.
+
+### Text fields
+Source: **m3.material.io/components/text-fields/guidelines**. Code:
+`lib/core/design/widgets/text_fields.dart` (`TashilTextField`,
+`RequiredLabel`, `RequiredFieldsNote`, `FormColumn`), on the official
+`TextField`. Live: playground tab "المدخلات", section "حقول النص".
+
+- Variant: **outlined** everywhere (M3: less emphasis, simpler forms
+  with many fields). Filled and outlined are never mixed in one form or
+  region.
+- Every field has a label: short, one line, never cut. It may be
+  dropped only when an adjacent label sits at the field's leading edge
+  (then give the field a semantics label).
+- Required: asterisk after the label (read out as "مطلوب"), and one
+  `RequiredFieldsNote` at the top of the form. Mark all required fields.
+- Input: **single line** (names, prices, barcodes), **multi-line** that
+  grows up to 4 lines (short notes), **text area** with a fixed height
+  that scrolls (return reason, supplier notes).
+- Prefix and suffix text: units ("كجم"), country code ("+20"). In
+  Arabic the currency follows the amount, so "ج.م" is a suffix.
+- Supporting text: one line ideally. Character counter whenever there is
+  a limit (`maxLength`).
+- Error text **replaces** the supporting text (never added under it), and
+  says how to fix the most likely error. An error icon always shows with
+  it. A valid icon (check) can confirm good input, also for colour-blind
+  users.
+- Icons: leading icon describes the input; trailing icon opens something
+  (scan, date picker); the clear icon appears only while there is text.
+  Icons swap sides in RTL (Flutter does this). Voice input is not used.
+- Read-only: looks like a normal field (not disabled) and says
+  "للقراءة بس". Disabled is only for fields that do not apply right now.
+- Adaptive: full width on compact; from 600dp `FormColumn` caps fields
+  at 560dp at the start edge, never across the whole screen.
+- Density: not by default (keeps 48dp targets). A dense layout is a
+  setting people choose (`isDense` + compact visual density).
 
 ### Sliders
 Source: **m3.material.io/components/sliders/guidelines**. Code:

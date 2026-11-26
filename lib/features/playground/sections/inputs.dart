@@ -8,6 +8,7 @@ import 'common.dart';
 import 'scroll_fields_demo.dart';
 import 'search_demo.dart';
 import 'sliders_demo.dart';
+import 'text_fields_demo.dart';
 
 class InputsSection extends StatefulWidget {
   const InputsSection({super.key});
@@ -48,43 +49,18 @@ class _InputsSectionState extends State<InputsSection> {
   Widget build(BuildContext context) {
     final loc = MaterialLocalizations.of(context);
     return SectionList([
-      SpecSection(
+      const SpecSection(
         title: 'حقول النص',
         m3: 'Text fields',
-        spec: 'components/text-fields',
+        spec: 'components/text-fields/guidelines',
         rule:
-            'Outlined دايماً. الأرقام والمبالغ بكيبورد رقمي. '
-            'رسالة الخطأ تحت الحقل مش في Dialog.',
-        children: [
-          const TextField(
-            decoration: InputDecoration(
-              labelText: 'اسم الصنف',
-              prefixIcon: Icon(Icons.inventory_2_outlined),
-            ),
-          ),
-          const SizedBox(height: TashilSpacing.md),
-          const TextField(
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: 'سعر البيع',
-              suffixText: 'ج.م',
-              helperText: 'بالجنيه، رقمين عشريين',
-            ),
-          ),
-          const SizedBox(height: TashilSpacing.md),
-          const TextField(
-            decoration: InputDecoration(
-              labelText: 'الباركود',
-              errorText: 'الباركود ده مسجّل لصنف تاني',
-              suffixIcon: Icon(Icons.qr_code_scanner),
-            ),
-          ),
-          const SizedBox(height: TashilSpacing.md),
-          const TextField(
-            enabled: false,
-            decoration: InputDecoration(labelText: 'رقم الفاتورة (تلقائي)'),
-          ),
-        ],
+            'Outlined في كل الفورمات (مفيش خلط بين النوعين في نفس المكان). '
+            'كل حقل ليه عنوان قصير ظاهر. المطلوب عليه * ومعاه ملاحظة واحدة '
+            'فوق الفورم. الخطأ بياخد مكان النص المساعد ومعاه أيقونة خطأ. '
+            'عداد حروف لو فيه حد أقصى. أيقونة المسح تظهر بس لما يكون فيه '
+            'كلام. حقل للقراءة بس شكله عادي ومكتوب إنه للقراءة. من 600 '
+            'الحقول ليها أقصى عرض. العرض المضغوط اختيار مش افتراضي.',
+        children: [TextFieldsDemo()],
       ),
       const SpecSection(
         title: 'البحث',
