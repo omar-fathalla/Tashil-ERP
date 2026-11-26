@@ -171,8 +171,8 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('محتوى'), findsOneWidget);
-    expect(t.getSize(find.byType(SafeArea).last).width, 360);
-    await t.tap(find.byType(CloseButton));
+    expect(t.getSize(find.byType(SideSheetPanel)).width, 400);
+    await t.tap(find.byIcon(Icons.close));
     await t.pumpAndSettle();
     expect(find.text('محتوى'), findsNothing);
   });

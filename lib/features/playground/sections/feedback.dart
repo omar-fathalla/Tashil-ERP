@@ -9,6 +9,7 @@ import '../../../core/design/widgets/dialogs.dart';
 import '../../../core/design/widgets/loading_indicator.dart';
 import 'common.dart';
 import 'sheets_demo.dart';
+import 'side_sheets_demo.dart';
 
 class FeedbackSection extends StatelessWidget {
   const FeedbackSection({super.key});
@@ -163,6 +164,17 @@ class FeedbackSection extends StatelessWidget {
             'اللي بيشتغل جنب الشاشة (السلة). دوسة على المقبض بتغير الارتفاع. '
             'من 840 بتبقى ورقة جانبية.',
         children: [SheetsDemo()],
+      ),
+      const SpecSection(
+        title: 'الورقة الجانبية',
+        m3: 'Side sheets',
+        spec: 'components/side-sheets/guidelines',
+        rule:
+            'على الحافة (الشمال في العربي)، أقصى عرض 400. Modal على الموبايل '
+            '(فوق المحتوى ولازم تتقفل)، وStandard من 840 (الصفحة بتضيق '
+            'وتفضل شغالة). زرار قفل دايماً، والأزرار تحت بعد فاصل. اسحبها '
+            'بالعرض عشان تقفلها (رجوع تنبؤي). سكرول رأسي بس.',
+        children: [SideSheetsDemo()],
       ),
       SpecSection(
         title: 'الإشعار السريع',

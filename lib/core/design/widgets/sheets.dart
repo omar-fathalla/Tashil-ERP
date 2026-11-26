@@ -2,6 +2,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../motion.dart';
 import '../tokens.dart';
+import 'side_sheets.dart';
+
+export 'side_sheets.dart';
 
 /// Bottom sheets that follow m3.material.io/components/bottom-sheets,
 /// built on Flutter's official [showModalBottomSheet],
@@ -179,83 +182,6 @@ Future<T?> showAdaptiveSheet<T>({
         const SizedBox(height: TashilSpacing.lg),
       ],
     ),
-  );
-}
-
-/// Modal side sheet at the end edge (left in Arabic), 360dp wide. Flutter
-/// has no side sheet yet: this is a [showGeneralDialog] with a slide.
-Future<T?> showSideSheet<T>({
-  required BuildContext context,
-  required String title,
-  required WidgetBuilder builder,
-}) {
-  final l = MaterialLocalizations.of(context);
-  return showGeneralDialog<T>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: l.modalBarrierDismissLabel,
-    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.32),
-    transitionDuration: TashilMotion.scaled(
-      context,
-      TashilEasing.emphasizedDecelerate.duration,
-    ),
-    pageBuilder: (c, _, _) => Align(
-      alignment: AlignmentDirectional.centerEnd,
-      child: Material(
-        color: Theme.of(c).colorScheme.surfaceContainerLow,
-        elevation: 1,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadiusDirectional.horizontal(
-            start: Radius.circular(TashilRadius.large),
-          ),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            width: 360,
-            height: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(
-                    TashilSpacing.lg,
-                    TashilSpacing.sm,
-                    TashilSpacing.sm,
-                    TashilSpacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: Theme.of(c).textTheme.titleLarge,
-                        ),
-                      ),
-                      CloseButton(onPressed: () => Navigator.pop(c)),
-                    ],
-                  ),
-                ),
-                Expanded(child: SingleChildScrollView(child: builder(c))),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-    transitionBuilder: (c, a, _, child) {
-      final rtl = Directionality.of(c) == TextDirection.rtl;
-      return SlideTransition(
-        position: Tween(begin: Offset(rtl ? -1 : 1, 0), end: Offset.zero)
-            .animate(
-              CurvedAnimation(
-                parent: a,
-                curve: TashilEasing.emphasizedDecelerate.curve,
-                reverseCurve: TashilEasing.emphasizedAccelerate.curve,
-              ),
-            ),
-        child: child,
-      );
-    },
   );
 }
 

@@ -114,6 +114,8 @@ so you can check any component under each condition.
 | Many actions on an item, or actions needing icons and descriptions (mobile) | `showActionSheet` (modal bottom sheet) | Opens at content height, never above 50%; long lists pull to full screen with a close button |
 | Content that works next to the screen (cart over products) | `StandardBottomSheet` | Preset heights; tap the handle to change; collapse button at full height |
 | Details that should be a side sheet on wide screens | `showAdaptiveSheet` | Bottom sheet below 840dp, side sheet from 840dp |
+| Filters or settings over the screen | `showSideSheet` (modal side sheet) | End edge (left in Arabic), max 400dp, close button, actions at the bottom after a divider |
+| Details next to a list on tablet | `StandardSideSheetLayout` | The body shrinks to make room; both stay usable |
 | Confirmation with undo | `SnackBar` (floating) | Not for serious errors |
 | Persistent state (offline, shift closed) | `MaterialBanner` | |
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
@@ -327,6 +329,36 @@ section "الورقة السفلية".
   side sheet (Flutter has no side sheet). Everything else is Flutter's
   `showModalBottomSheet` and `DraggableScrollableSheet`.
 
+### Side sheets
+Source: **m3.material.io/components/side-sheets/guidelines** and
+**/specs**. Code: `lib/core/design/widgets/side_sheets.dart`. Live:
+playground tab "التنبيهات", section "الورقة الجانبية".
+
+- **Modal** (preferred on compact): over a scrim, must be dismissed to go
+  back to the screen. Colour `surfaceContainerLow`. Default is detached:
+  16dp margins and rounded on all corners. It can also sit on the edge.
+- **Standard** (medium and up): beside the body, which shrinks with an
+  animation to make room; both stay usable (filters, details of the
+  selected item). Colour `surface` with an `outlineVariant` edge.
+- At the end edge, so on the **left in Arabic**, with everything
+  mirrored. Max width 400dp. On narrow screens a strip of scrim stays
+  visible to tap.
+- Anatomy: optional back button, headline, **close button** (always:
+  M3 strongly recommends it), content, an optional divider, then the
+  action buttons in a 72dp area (padding 16 top, 24 bottom, 24 sides),
+  aligned to the start. The main action is filled, the other outlined.
+- Content scrolls vertically on its own. Never horizontally.
+- Motion: enters by sliding in from the edge with emphasized decelerate
+  and a fade; exits with emphasized accelerate. **Predictive back:**
+  dragging the modal sheet sideways detaches it from the top and bottom
+  and scales it toward the drag. Releasing past a third of its width (or
+  a fling) closes it; otherwise it springs back with the fast spatial
+  spring.
+- Hand-built: Flutter has no side sheet. It is composed from
+  `showGeneralDialog`, `Material` and `AnimatedContainer`, using the
+  spec's numbers. The drag follows Android's predictive back look; the
+  real system back gesture still closes it through Flutter's route.
+
 ### Menus
 Source: **m3.material.io/components/menus/guidelines**. Code:
 `lib/core/design/widgets/menus.dart`. Live: playground tab "المدخلات",
@@ -428,7 +460,8 @@ page, and replace it with Flutter's version once it lands.
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
 | Hiding navigation bar, collapsible rail with menu button, modal expanded rail, adaptive shell | `navigation.dart`, composed from the official `NavigationBar`, `NavigationRail`, `Drawer` | m3.material.io/components/navigation-rail/guidelines |
 | Scroll field (snapping wheel, keyboard input, 3 sizes) | `ScrollField` in `widgets/scroll_field.dart`, on the official `ListWheelScrollView` | m3.material.io/components/scroll-fields/guidelines |
-| Bottom sheet handle that cycles heights, full-screen close bar, side sheet | `widgets/sheets.dart`, on the official `showModalBottomSheet` + `DraggableScrollableSheet` | m3.material.io/components/bottom-sheets/guidelines |
+| Side sheets (modal + standard, detached, drag-to-close with predictive back look) | `widgets/side_sheets.dart`, composed from `showGeneralDialog`, `Material`, `AnimatedContainer` | m3.material.io/components/side-sheets/guidelines |
+| Bottom sheet handle that cycles heights, full-screen close bar | `widgets/sheets.dart`, on the official `showModalBottomSheet` + `DraggableScrollableSheet` | m3.material.io/components/bottom-sheets/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component
