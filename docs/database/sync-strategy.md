@@ -71,10 +71,8 @@ verify: sha256(canonical(body)) == hash   // else reject as client bug, nothing 
 if not exists:
     claim document_numbers/{invoice_no}      // already taken by another id → flag duplicate_number
     create document + server_received_at + flags
-    apply projections in the SAME transaction:
-        stock_levels (+ last_seq_by_device[deviceId] = seq)
-        cash/credit effects that are part of this document
     → ACK(seq, "created")
+// projections (stock, balances, summaries) are NOT in this transaction: see section 11
 elif stored.payload_hash == hash:
     → ACK(seq, "duplicate")            // retry of something already stored
 else:
@@ -86,7 +84,7 @@ else:
 - **timeout ومش عارف النتيجة = إعادة محاولة لنفس الـ seq**، مش بيعة جديدة. الـ hash بيضمن إن ده آمن.
 - **تحسين:** لو حصل CONFLICT، الجهاز **مبيوقفش الطابور كله**. بيعلّم الصف `poison`، يكمل في اللي بعده، ويبعت تنبيه للدعم. لو وقفنا الطابور عشان مستند واحد، كل مبيعات الجهاز اللي بعده هتقف معاه.
 - اللي ممكن الـ Function تعمله `flags` على البيعة من غير ما ترفضها: `oversold` (المخزون بقى بالسالب)، `device_revoked`، `clock_skew`، `price_below_cost`. كل flag بيعمل صف في `stock_alerts` أو `audit_logs` عشان مدير الفرع يشوفه.
-- الحاجات اللي **مش** بتتعمل في نفس الـ transaction (عشان تبقى خفيفة): `daily_summaries` و`expected_cash` بتتحسب في trigger بعدين، وهي projections ممكن تتعاد في أي وقت.
+- الـ transaction دي بتلمس مستندين بس، والاتنين رقمهم فريد (المستند نفسه وحجز الرقم المطبوع)، فمفيهاش contention تقريبًا. كل الـ projections (المخزون، الأرصدة، الملخصات، `expected_cash`) بتتعمل بعدين في الـ projector (القسم 11).
 
 ### 3.2 الجهاز الملغي (revoked)
 
@@ -124,7 +122,7 @@ available = snapshot.quantity_milli
           + (دخول الجهاز اللي seq بتاعه > نفس الرقم)
 ```
 
-- **تحسين:** المقترح الأصلي بيقول "اطرح اللي لسه مترفعش". المشكلة إن الـ snapshot ممكن يتقري قبل ما الـ ACK يوصل، فبيعة ممكن تتطرح مرتين أو متتطرحش خالص. الحل إن الـ `stock_levels` نفسه شايل `last_seq_by_device` بيتحدّث في نفس transaction الرفع. فالجهاز بيعرف بالظبط أنهي مبيعات من عنده موجودة جوه الـ snapshot، من غير ما يعتمد على توقيت الـ ACK.
+- **تحسين:** المقترح الأصلي بيقول "اطرح اللي لسه مترفعش". المشكلة إن الـ ACK مش معناه إن المخزون اتحدّث (الـ projection بيحصل بعد الـ ACK)، فبيعة ممكن تتطرح مرتين أو متتطرحش خالص. الحل إن كل مستند `stock_levels` شايل `last_seq_by_device`، والـ projector بيطبّق مبيعات كل جهاز **بالترتيب** (القسم 11.4). فلو الرقم ده للجهاز = 40، يبقى كل مبيعاته اللي فيها الصنف ده لحد seq 40 جوه الرصيد، وكل اللي بعدها لأ. والجهاز بيطرح اللي بعدها بس.
 - سحب `stock_levels` جديد **مبيمسحش** المبيعات اللي مترفعتش. بيعمل rebase عليها، مش replace.
 
 ### 5.1 التحويل بين الفروع
@@ -256,3 +254,65 @@ await outbox.insert(
 5. **اكتشاف الفجوات بالـ seq:** السيرفر بيحفظ `last_acked_seq`، ولو وصله seq أكبر من اللي بعده على طول بيعمل تنبيه. الـ seq هنا للترتيب والمراقبة، والـ ULID للتفرّد.
 6. **حماية الرقم المطبوع:** الـ ULID بيمنع تكرار المستند، لكنه مش بيمنع إن فاتورتين مختلفتين ياخدوا نفس `invoice_no` (مثلا لو قاعدة بيانات الجهاز اترجعت من backup قديم). عشان كده السيرفر بيحجز `document_numbers/{invoice_no}` في نفس الـ transaction. ولو الرقم محجوز لمستند تاني، البيعة **بتتقبل** (لأنها اتطبعت) بـ flag `duplicate_number` وتنبيه للدعم.
 7. **فحص منطقي بين الـ ULID والوقت:** الـ timestamp اللي جوه الـ ULID المفروض يبقى قريب من `device_time`. لو الفرق كبير، بيتعمل flag `clock_skew`، وده بيساعد في اكتشاف تلاعب في ساعة الجهاز.
+
+---
+
+## 11. إعادة المحاولة في Firestore transactions
+
+### 11.1 الخلاصة
+
+**الـ transaction بتاعة البيعة صغيرة جدًا، وإعادة المحاولة الطويلة مكانها الـ outbox worker، مش جوه الـ transaction.** وبما إن رقم مستند البيعة هو الـ ULID والـ hash متخزن، أي إعادة محاولة (من Firestore نفسه أو من الـ outbox) مستحيل تطبّق البيعة مرتين، لا على المخزون ولا على الدرج. أسوأ حالة إن المزامنة تتأخر، لكن الحسابات مبتبوظش.
+
+### 11.2 الـ SDKs بتعمل إيه (اتأكدت منه من مستندات Firebase)
+
+| الحاجة | المصدر الرسمي بيقول | ملاحظة على المقترح |
+|---|---|---|
+| الـ concurrency في SDKs الموبايل والويب | دايمًا optimistic، مهما كان إعداد القاعدة | ✅ مطابق |
+| الـ concurrency في مكتبات السيرفر (Node وغيره) | بتتبع إعداد القاعدة. الافتراضي في Standard edition هو `PESSIMISTIC`، وفي Enterprise هو `OPTIMISTIC`، والإعداد بيتغير بـ `gcloud firestore databases update --concurrency-mode` | ✅ مطابق |
+| إعادة المحاولة التلقائية | المكتبات بتعيد الـ transaction لوحدها لما يحصل contention، "عدد محدود من المرات"، وبعدين بترجع `ABORTED: Too much contention on these documents` | ⚠️ رقم الـ 5 محاولات الافتراضي **مش مكتوب** في الصفحات اللي قريتها. الـ API فيه `maxAttempts` في `TransactionOptions`، ولازم نتأكد من القيمة الافتراضية في الـ SDK اللي هنستخدمه بالظبط |
+| الـ transaction والجهاز offline | "Transactions will fail when the client is offline" | ✅ مطابق، وده سبب تاني إن البيع مبيعتمدش على transaction من الجهاز |
+| مدة الـ transaction | 270 ثانية، و60 ثانية لو مفيش نشاط | ✅ مطابق |
+| مدة الـ lock | 20 ثانية، وبعدها Firestore بيفك الـ lock والـ transaction بتفشل | ✅ مطابق |
+| حجم الطلب | 10 MiB، وحجم الـ transaction بيتحسب بالمستندات والـ index entries اللي بتتعدل | ✅ مطابق |
+| القراءة قبل الكتابة | كل القراءات لازم تبقى قبل أي كتابة | ✅ مطابق |
+| الـ transaction function ممكن تشتغل أكتر من مرة | ومفروض متغيرش أي state برا الـ transaction | ✅ مطابق: ممنوع طباعة أو API خارجي أو increment برا الـ transaction جوه الـ function |
+| أنواع الأخطاء اللي بتتعاد (`UNAVAILABLE` و`DEADLINE_EXCEEDED` و`INTERNAL` و`CANCELLED`) | مش مكتوبة بالتفصيل في الصفحات اللي قريتها | ⚠️ منطقية، لكن نتأكد منها من كود الـ SDK وقت التنفيذ |
+| إعادة تشغيل Cloud Function (2nd gen) لما `retry` يبقى مفعّل | لحد 24 ساعة، والانتظار بين المحاولات بيزيد من 10 لـ 600 ثانية. والـ function لازم تبقى idempotent، ويُفضّل تستخدم الـ event ID أو تسجّل إن الحدث اتعالج | ✅ مطابق |
+
+### 11.3 الاستراتيجية في Tashil
+
+1. **transaction الرفع (`syncPush`) صغيرة:** بتقرا المستند، ولو مش موجود بتكتبه وتحجز الرقم المطبوع، ولو موجود بنفس الـ hash بترجع نجاح، ولو بـ hash مختلف بتكتب dead-letter. **مفيش `stock_levels` ولا أرصدة ولا ملخصات جواها.** ده تعديل على اللي كان مكتوب في النسخة الأولى من الوثيقة دي، اللي كانت بتحدّث المخزون في نفس الـ transaction.
+2. **الإعادة القصيرة على Firestore:** الإعادة التلقائية في الـ SDK كفاية للـ contention العادي في محل. ولو ظهر `ABORTED` كتير، نزوّد `maxAttempts` شوية (مثلا 8 لـ 10) في الـ Admin SDK، لكن من غير مبالغة، لأن الانتظار الطويل مكانه الـ outbox.
+3. **الإعادة الطويلة على الـ outbox worker:**
+   - لو الـ transaction فشلت في الآخر بخطأ مؤقت، صف الـ outbox بيفضل `pending` (أو `retry_later`).
+   - backoff أُسّي مع jitter في الـ worker: يبدأ من 1 لـ 2 ثانية، وأقصاه 5 دقايق.
+   - **يفضل يحاول ساعات أو أيام.** الإيصال اللي اتطبع لازم يوصل في الآخر.
+   - **مبيعملش ULID جديد أبدًا.**
+4. **تصنيف الأخطاء:**
+
+| النوع | الأمثلة | اللي بيحصل |
+|---|---|---|
+| مؤقت | `ABORTED`، `UNAVAILABLE`، `DEADLINE_EXCEEDED`، `INTERNAL`، مفيش نت، timeout | يتعاد من الـ outbox بعدين |
+| دائم | permission denied، بيانات غلط، المستند أكبر من الحد، الـ hash مش مطابق للـ body | dead-letter على الجهاز + تنبيه. **البيعة نفسها بتفضل على الجهاز ومتسجلة**، والدعم بيصلّحها |
+| نفس الـ ULID بمحتوى مختلف | `CONFLICT` من `syncPush` | poison. مبيتعادش، ويتعرض على الأدمن، والطابور بيكمل |
+| الجهاز ملغي أو الـ token خلص | `unauthenticated` | يتعاد بعد refresh للـ token. ولو الحساب مقفول، الطابور بيقف ويظهر تنبيه "الجهاز محتاج إعادة تفعيل" من غير ما حاجة تتمسح |
+
+### 11.4 الـ projector (المخزون والأرصدة والملخصات)
+
+ده تحسين على المقترح: مش بس trigger idempotent، لكن trigger **بيطبّق مستندات كل جهاز بالترتيب**.
+
+- trigger على إنشاء أي مستند (`onDocumentCreated`) مع `retry: true`.
+- **منع التطبيق مرتين:** كل جهاز ليه مستند `devices/{id}/projection/state` فيه `applied_seq`. الـ trigger بيفتح transaction: لو `seq <= applied_seq` يبقى المستند اتطبق قبل كده ويخرج. لو `seq == applied_seq + 1` بيطبّقه ويطبّق أي مستندات بعده كانت مستنية. لو أكبر من كده بيحطه في `pending` ويخرج (الـ seq اللي ناقص هيوصل ويسحبه).
+- **ليه بالترتيب:** عشان `stock_levels.last_seq_by_device` يبقى صح (القسم 5). لو مبيعات نفس الجهاز اتطبقت مش بالترتيب، الجهاز هيحسب الكمية المتاحة غلط.
+- **الـ contention:** الـ transaction دي بتلمس مستند الـ state بتاع الجهاز (محدش غيره بيكتب فيه) ومستندات `stock_levels` للأصناف اللي في البيعة بس. لو صنف عليه ضغط من أجهزة كتير، الـ trigger هو اللي بيستنى ويعيد، مش الكاشير ولا الـ outbox.
+- **الأرقام المشتقة** (حركات المخزون والقيود) رقمها ثابت من مصدرها (`SALE_{saleId}_{lineNo}`)، فحتى لو الحماية اللي فوق فشلت، الكتابة التانية بتلاقي نفس المستند.
+- **`daily_summaries` والعدادات:** بتتحدّث بـ `FieldValue.increment` جوه نفس transaction الـ projector، فبتاخد نفس الحماية من التطبيق مرتين. ولو صنف أو ملخص بقى عليه ضغط فعلًا، نقسّمه على أكتر من مستند (sharded counters) ونجمعهم وقت القراءة.
+- **الإصلاح:** الـ projections كلها ممكن تتعاد من الصفر من المستندات (rebuild job)، فلو حصل أي غلط في trigger، بنعيد البناء من غير ما نلمس أي مستند مالي.
+
+### 11.5 لما الأجهزة كلها ترجع للنت مرة واحدة
+
+لو النت قطع عن الفرع كله ورجع، كل الأجهزة هترفع في نفس اللحظة. عشان كده:
+- الـ worker بيستنى وقت عشوائي صغير (0 لـ 10 ثواني) قبل أول رفع بعد رجوع النت.
+- `syncPush` بيرفع batches بالترتيب، والـ projector بيمتص الضغط على `stock_levels` بالإعادة بتاعته، فالكاشير مبيحسش بحاجة.
+
+مصادر القسم ده: [Transaction serializability and isolation](https://firebase.google.com/docs/firestore/transaction-data-contention)، [Transactions and batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions)، [Quotas and limits](https://firebase.google.com/docs/firestore/quotas)، [Retry asynchronous functions](https://firebase.google.com/docs/functions/retries).

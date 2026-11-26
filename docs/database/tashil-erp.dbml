@@ -225,6 +225,8 @@ Table devices {
   last_acked_seq bigint [note: 'a gap between this and the next pushed seq raises an alert (lost or deleted outbox rows)']
   last_chain_hash varchar [note: 'hash of the last accepted outbox row; each row carries prev_hash (tamper-evident chain)']
   last_pull_at timestamp [note: 'device cannot open a new shift after companies.max_offline_hours without a pull']
+  projected_seq bigint [note: 'function: last seq applied by the in-order projector (devices/{id}/projection/state)']
+  pending_projection "bigint[]" [note: 'function: seqs received out of order, waiting for the missing one']
   clock_offset_ms bigint [note: 'device clock minus server clock at last sync']
 }
 
@@ -367,7 +369,7 @@ TableGroup inventory_module {
 }
 
 Table stock_levels {
-  Note: 'writer: function only (FieldValue.increment from stock_movements). Doc id = {branch_id}_{product_id}'
+  Note: 'writer: function only (the in-order projector, not the syncPush transaction). Doc id = {branch_id}_{product_id}'
   company_id varchar [ref: > companies.id]
   branch_id varchar [ref: > branches.id]
   product_id varchar [ref: > products.id]
