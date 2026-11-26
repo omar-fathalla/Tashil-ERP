@@ -117,7 +117,7 @@ so you can check any component under each condition.
 | Details that should be a side sheet on wide screens | `showAdaptiveSheet` | Bottom sheet below 840dp, side sheet from 840dp |
 | Filters or settings over the screen | `showSideSheet` (modal side sheet) | End edge (left in Arabic), max 400dp, close button, actions at the bottom after a divider |
 | Details next to a list on tablet | `StandardSideSheetLayout` | The body shrinks to make room; both stay usable |
-| Confirmation with undo | `SnackBar` (floating) | Not for serious errors |
+| Short update about something the app did, maybe with undo | `showTashilSnackBar` (official `SnackBar`, floating) | Text only, one text action; replaces the current one; not for errors that need a decision |
 | Persistent state (offline, shift closed) | `MaterialBanner` | |
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
 | Amount / quantity entry | `NumericKeypad` | Always 7-8-9 on top, even in RTL |
@@ -210,6 +210,30 @@ slider (`SliderThemeData(year2023: false)`). Live: playground tab
   "Space + arrows" larger step yet.
 - Hand-built: sizes, inset icon, centered track and vertical wrapper.
   The slider itself is Flutter's.
+
+### Snackbars
+Source: **m3.material.io/components/snackbar/guidelines**. Code:
+`lib/core/design/widgets/snackbars.dart` (`showTashilSnackBar`, on the
+official `SnackBar` and `ScaffoldMessenger`). Live: playground tab
+"التنبيهات", section "الإشعار السريع".
+
+- For short, low-priority updates about something the app already did
+  ("اتبعت للطابعة", "اتشال صنف من السلة"). Anything that needs a decision
+  or blocks work is a dialog; lasting state (offline) is a banner.
+- Text only: no icons, links or styled text. One line where possible,
+  two at most (longer text is cut with an ellipsis).
+- At most one action, a text button ("تراجع"), never a filled button and
+  never "إلغاء" (closing is the close button's job). A long action label
+  moves to its own line (Flutter does this).
+- Without an action it disappears after 4 seconds. With an action it
+  stays until used or closed, so it always gets a close button.
+- One at a time. Newer information replaces the current snackbar
+  straight away (sync progress, then the result); they never stack.
+- Floating from the theme: above the FAB and the navigation bar, never
+  in front of them. On compact it spans the width with margins; from
+  600dp it is centred, at most 560dp wide, never flush to an edge.
+- Also show the result where the action happened (the save button turns
+  into "اتحفظ"), so people who miss the snackbar still see it.
 
 ### Dates and times
 Sources: **m3.material.io/components/date-pickers/guidelines** and

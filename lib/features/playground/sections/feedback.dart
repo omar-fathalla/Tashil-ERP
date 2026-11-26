@@ -7,9 +7,11 @@ import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/dialogs.dart';
 import '../../../core/design/widgets/loading_indicator.dart';
+import '../../../core/design/widgets/snackbars.dart';
 import 'common.dart';
 import 'sheets_demo.dart';
 import 'side_sheets_demo.dart';
+import 'snackbars_demo.dart';
 
 class FeedbackSection extends StatelessWidget {
   const FeedbackSection({super.key});
@@ -87,9 +89,7 @@ class FeedbackSection extends StatelessWidget {
                   },
                 );
                 if (r != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('اتسجل المرتجع')),
-                  );
+                  showTashilSnackBar(context, 'اتسجل المرتجع');
                 }
               },
               child: const Text('اختيار من قائمة'),
@@ -176,22 +176,17 @@ class FeedbackSection extends StatelessWidget {
             'بالعرض عشان تقفلها (رجوع تنبؤي). سكرول رأسي بس.',
         children: [SideSheetsDemo()],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'الإشعار السريع',
         m3: 'Snackbar',
-        spec: 'components/snackbar',
-        rule: 'تأكيد إجراء تم + زر تراجع لو ممكن. مش للأخطاء الخطيرة.',
-        children: [
-          OutlinedButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('تم حذف الصنف من السلة'),
-                action: SnackBarAction(label: 'تراجع', onPressed: () {}),
-              ),
-            ),
-            child: const Text('Show snackbar'),
-          ),
-        ],
+        spec: 'components/snackbar/guidelines',
+        rule:
+            'رسالة قصيرة عن حاجة السيستم عملها، نص بس (سطرين بالكتير). '
+            'زرار نصي واحد بالكتير، ومعاه زرار قفل والإشعار يفضل لحد ما '
+            'يتقفل؛ من غيره يختفي بعد 4 ثواني. واحد بس في المرة، والجديد '
+            'يشيل القديم. فوق الـ FAB وشريط التنقل، ومن 600 في النص. '
+            'النتيجة تبان كمان مكان الإجراء نفسه.',
+        children: [SnackbarsDemo()],
       ),
       const SpecSection(
         title: 'مؤشر التحميل',
@@ -320,8 +315,7 @@ class _NewProductDialogState extends State<_NewProductDialog> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('اتضاف "${_name.text}"')));
+    showTashilSnackBar(context, 'اتضاف "${_name.text}"');
     _name.clear();
     _price.clear();
     Navigator.pop(context);

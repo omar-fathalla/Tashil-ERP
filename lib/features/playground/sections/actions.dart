@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/button_group.dart';
 import '../../../core/design/widgets/fab_menu.dart';
+import '../../../core/design/widgets/snackbars.dart';
 import 'common.dart';
 
 enum _Pay { cash, card, credit }
@@ -359,9 +360,7 @@ class _FabMenuDemo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    void done(String what) =>
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(what)));
+    void done(String what) => showTashilSnackBar(context, what);
     return Container(
       height: 380,
       clipBehavior: Clip.antiAlias,
