@@ -29,6 +29,12 @@ lib/
 - مفيش حذف: الفاتورة بتتلغي (`cancelled`) مع حركة `RETURN` عكسية.
 - رقم الفاتورة: `POS1-20261125-0001` (كود الجهاز + التاريخ + مسلسل يومي).
 
+## التصميم (Material Design 3)
+كل قواعد الواجهة في [docs/design-system.md](docs/design-system.md)، وصفحة البلاي جراوند بتعرض كل المكونات اللي هنستخدمها:
+```bash
+flutter run -t lib/main_playground.dart
+```
+
 ## التشغيل
 ```bash
 flutter pub get

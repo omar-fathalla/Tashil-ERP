@@ -41,6 +41,9 @@ dependencies:
   uuid: ^4.6.0
   path_provider: ^2.1.6
   path: ^1.9.1
+  animations: ^3.0.0
+  intl: ^0.20.2
+  dynamic_color: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -66,6 +69,13 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Cairo (SIL OFL 1.1, assets/fonts/cairo/OFL.txt). Bundled so Arabic text
+  # renders identically offline. Variable font: weights via the wght axis.
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/cairo/Cairo-Variable.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:
