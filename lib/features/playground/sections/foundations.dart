@@ -7,6 +7,7 @@ import 'color_roles_demo.dart';
 import 'common.dart';
 import 'content_color_demo.dart';
 import 'typography_demo.dart';
+import 'layout_demo.dart';
 
 class FoundationsSection extends StatelessWidget {
   const FoundationsSection({super.key});
@@ -88,10 +89,22 @@ class FoundationsSection extends StatelessWidget {
           ]),
         ],
       ),
+      const SpecSection(
+        title: 'التخطيط ونقاط التوقف',
+        m3: 'Layout · breakpoints · panes',
+        spec: 'foundations/layout/layout-overview/overview',
+        rule:
+            '5 نقاط توقف: مضغوط تحت 600، متوسط 600–839، موسّع 840–1199، '
+            'كبير 1200–1599، كبير جداً من 1600. كل المحتوى جوه أجزاء (panes): '
+            'جزء واحد لحد المتوسط، اتنين من الموسّع، وتلاتة بحد أقصى في الكبير '
+            'جداً. الهامش 16 في المضغوط و24 من المتوسط، وبين الأجزاء 24. '
+            'المقبض بين الجزأين بيغيّر العرض، ولو سحبته للآخر بيقفل جزء.',
+        children: [LayoutDemo()],
+      ),
       SpecSection(
         title: 'المسافات',
         spec: 'foundations/layout/understanding-layout/spacing',
-        rule: 'شبكة 4dp. هامش الصفحة 16. أقل مساحة لمس 48.',
+        rule: 'شبكة 4dp. هامش الصفحة 16 في المضغوط و24 من المتوسط. أقل مساحة لمس 48.',
         children: [
           for (final (n, v) in const [
             ('xs', TashilSpacing.xs),

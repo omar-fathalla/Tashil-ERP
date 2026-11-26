@@ -107,7 +107,9 @@ abstract final class TashilSizes {
   /// Width of the receipt preview: 58mm paper = 384 printer dots.
   static const receiptDots = 384.0;
 
-  /// Width breakpoints from M3 window size classes.
+  /// Start of the medium and expanded breakpoints (M3, previously window
+  /// size classes). Same values as [TashilBreakpoint] in layout.dart, which
+  /// has all five.
   static const compactMax = 600.0;
   static const mediumMax = 840.0;
 }

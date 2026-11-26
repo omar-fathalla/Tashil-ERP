@@ -185,13 +185,58 @@ scale & tokens, applying type, editorial treatments). Code:
 
 ### Layout and touch (SUNMI V3: ~360 dp wide, compact window)
 - 4 dp grid: use `TashilSpacing` (`xs 4`, `sm 8`, `md 12`, `lg 16`, `xl 24`,
-  `xxl 32`). Page margin is 16.
+  `xxl 32`). Page margin is 16 on compact and 24 from medium
+  (`TashilBreakpoint.margin`).
 - Minimum touch target 48 dp (all buttons are themed to it). Primary POS
   actions (pay, confirm) are 56 dp (`TashilSizes.posButtonHeight`).
 - Corners follow the M3 shape scale (`TashilRadius`).
 - Use `EdgeInsetsDirectional` / `AlignmentDirectional` so RTL and LTR both work.
 - Price + badge style rows use `Wrap`, not `Row`, so they never overflow at
   360 dp. The playground test fails on any overflow.
+
+### Layout: breakpoints, panes, adaptive design
+From m3.material.io/foundations/layout (overview, parts of layout, adaptive
+design, and the breakpoint pages for the numbers). Code:
+`lib/core/design/layout.dart`.
+
+- **Breakpoints** (M3 renamed window size classes to breakpoints in May
+  2026): `TashilBreakpoint` compact < 600, medium 600–839, expanded
+  840–1199, large 1200–1599, extra-large 1600+. Use
+  `TashilBreakpoint.of(context)`; design for breakpoints, never for a
+  device, because rotation, split screen and resizing move the window
+  between them. Height breakpoints are rarely needed (content scrolls).
+- **Layout scaffold**: bars (app bar, navigation bar) frame the page, rails
+  hold the navigation rail, toolbars and the FAB, and **all content is in a
+  pane**. In Arabic the navigation and the first pane are on the right.
+- **Panes** (`PaneLayout`): one pane on compact and medium, two from
+  expanded, a third (standard side sheet, max 400dp) only on extra-large;
+  never more than three. Medium may use two 50/50 panes only for
+  low-density content (settings, `twoPanesOnMedium`), and then keeps the
+  navigation bar (`AdaptiveNavigationScaffold(barOnMedium: true)`).
+  Fixed-and-flexible: the fixed pane is 360dp on expanded, 412dp on large
+  and extra-large. Margins 16dp compact, 24dp from medium; 24dp spacer
+  between panes. On one-pane breakpoints the open item replaces the list
+  and the caller handles back.
+- **Containment**: panes blend with the background by default (implicit
+  grouping); `contained: true` gives them a container colour and rounded
+  corners (explicit grouping).
+- **Drag handle** (`PaneDragHandle`, hand-built: Flutter has no pane
+  scaffold and `flutter_adaptive_scaffold` is discontinued): resizes the
+  first pane, collapses to one pane when dragged to an edge, comes back by
+  dragging or double tap. Resize cursor, arrow keys, Home to reset, and
+  increase/decrease for screen readers.
+- **Adaptive strategies** across breakpoints: reveal (expanded rail, a
+  second pane), divide (panes), resize (cards, lists, panes), reposition
+  (actions move from the bottom on compact to the leading edge), swap
+  (bar to rail, collapsed to expanded rail, FAB to extended FAB with
+  `AdaptiveFab`, bottom sheet to menu). Only swap components that do the
+  same job: never a button for a chip or a menu.
+- **Line length**: keep long text at 40–60 characters per line at every
+  breakpoint (`ReadingWidth`).
+- **Reachability** on tablets in landscape: few interactions in the top
+  quarter, none hugging the bottom edge.
+- **Input**: every layout works with touch, pointer and a physical
+  keyboard, whatever the device (a tablet with a keyboard is a desktop).
 
 ### Components
 | Need | Use | Rule |

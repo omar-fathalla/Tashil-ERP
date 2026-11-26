@@ -244,10 +244,12 @@ class TashilNavigationRail extends StatelessWidget {
   }
 }
 
-/// App shell that picks the navigation for the window size (M3 adaptive
-/// design): bar on compact, collapsed rail on medium, expanded rail from
-/// 1200dp. The person can expand or collapse the rail with its menu
-/// button. Secondary destinations are in the modal rail on compact.
+/// App shell that picks the navigation for the breakpoint (M3 adaptive
+/// design): bar on compact, collapsed rail on medium and expanded, expanded
+/// rail from large (1200dp). The person can expand or collapse the rail
+/// with its menu button. Secondary destinations are in the modal rail on
+/// compact. A medium layout with two panes keeps the bar
+/// ([barOnMedium]) so the panes get the full width.
 class AdaptiveNavigationScaffold extends StatefulWidget {
   const AdaptiveNavigationScaffold({
     super.key,
@@ -258,6 +260,7 @@ class AdaptiveNavigationScaffold extends StatefulWidget {
     required this.onDestinationSelected,
     required this.body,
     this.fab,
+    this.barOnMedium = false,
   }) : assert(primary.length >= 3 && primary.length <= 5);
 
   final String title;
@@ -272,7 +275,10 @@ class AdaptiveNavigationScaffold extends StatefulWidget {
   final Widget body;
   final ({IconData icon, String label, VoidCallback onPressed})? fab;
 
-  /// From this width the rail starts expanded.
+  /// Medium screen showing two panes: navigation bar instead of the rail.
+  final bool barOnMedium;
+
+  /// From this width (the large breakpoint) the rail starts expanded.
   static const expandedFrom = 1200.0;
 
   @override
@@ -297,6 +303,9 @@ class _AdaptiveNavigationScaffoldState
       builder: (context, c) {
         final w = widget;
         if (c.maxWidth < TashilSizes.compactMax) return _compact();
+        if (w.barOnMedium && c.maxWidth < TashilSizes.mediumMax) {
+          return _compact();
+        }
         final expanded =
             _expanded ?? c.maxWidth >= AdaptiveNavigationScaffold.expandedFrom;
         return Scaffold(
