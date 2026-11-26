@@ -8,6 +8,7 @@ import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/dialogs.dart';
 import '../../../core/design/widgets/loading_indicator.dart';
 import 'common.dart';
+import 'sheets_demo.dart';
 
 class FeedbackSection extends StatelessWidget {
   const FeedbackSection({super.key});
@@ -151,38 +152,17 @@ class FeedbackSection extends StatelessWidget {
           ),
         ],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'الورقة السفلية',
-        m3: 'Bottom sheet',
-        spec: 'components/bottom-sheets',
-        rule: 'للخيارات السريعة على الصنف أو السلة (خصم، ملاحظة، حذف).',
-        children: [
-          OutlinedButton(
-            onPressed: () => showModalBottomSheet<void>(
-              context: context,
-              showDragHandle: true,
-              builder: (c) => const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: Icon(Icons.percent),
-                    title: Text('خصم على الصنف'),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.edit_note),
-                    title: Text('ملاحظة'),
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('حذف من السلة'),
-                  ),
-                  SizedBox(height: TashilSpacing.lg),
-                ],
-              ),
-            ),
-            child: const Text('Modal bottom sheet'),
-          ),
-        ],
+        m3: 'Bottom sheets',
+        spec: 'components/bottom-sheets/guidelines',
+        rule:
+            'Modal على الموبايل بس: بدل القائمة لما الخيارات كتير أو محتاجة '
+            'أيقونة ووصف. بتفتح على قد محتواها ومش أكتر من نص الشاشة، '
+            'والطويلة تتسحب لملء الشاشة ويظهر زرار قفل. Standard للمحتوى '
+            'اللي بيشتغل جنب الشاشة (السلة). دوسة على المقبض بتغير الارتفاع. '
+            'من 840 بتبقى ورقة جانبية.',
+        children: [SheetsDemo()],
       ),
       SpecSection(
         title: 'الإشعار السريع',

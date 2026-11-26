@@ -111,7 +111,9 @@ so you can check any component under each condition.
 | Actions from long press / right click | `ContextMenuRegion` | Same items as the item's overflow menu |
 | Pick one value in a form (unit, supplier) | `DropdownMenu` | `enableFilter` for long lists (10+) |
 | Pick several values (report columns) | `CheckboxMenuButton` in a `MenuAnchor` | `closeOnActivate: false`: stays open until dismissed |
-| Quick options on an item | `showModalBottomSheet` (drag handle) | |
+| Many actions on an item, or actions needing icons and descriptions (mobile) | `showActionSheet` (modal bottom sheet) | Opens at content height, never above 50%; long lists pull to full screen with a close button |
+| Content that works next to the screen (cart over products) | `StandardBottomSheet` | Preset heights; tap the handle to change; collapse button at full height |
+| Details that should be a side sheet on wide screens | `showAdaptiveSheet` | Bottom sheet below 840dp, side sheet from 840dp |
 | Confirmation with undo | `SnackBar` (floating) | Not for serious errors |
 | Persistent state (offline, shift closed) | `MaterialBanner` | |
 | Reports | `DataTable` in a horizontal scroll | Not an official M3 component; reports only |
@@ -297,6 +299,34 @@ section "البحث".
   scroll up (`SliverAppBar(floating: true, snap: true)`), or stay fixed.
 - Predictive back on Android comes from Flutter's route.
 
+### Bottom sheets
+Source: **m3.material.io/components/bottom-sheets/guidelines**. Code:
+`lib/core/design/widgets/sheets.dart`. Live: playground tab "التنبيهات",
+section "الورقة السفلية".
+
+- **Modal** (mobile only): instead of a menu or a simple dialog when the
+  list of actions is long, or items need icons and descriptions. It blocks
+  the screen until an action is chosen or it is dismissed.
+- Opens at its content height and never above **50%** of the screen.
+  Longer content can be pulled to full screen and scrolls inside; at full
+  screen the handle becomes an app bar with a close button.
+- Closes by: choosing an action, tapping the scrim, swiping down, the
+  close button, or back (predictive back comes from Flutter's route).
+- **Standard**: sits next to the main UI and both stay usable (the cart
+  over the products grid). Preset heights (peek, half, full); at full
+  height a collapse button returns it to peek.
+- **Drag handle**: drag it, or tap it to go to the next preset height.
+  That tap is the single-pointer alternative M3 requires; it has a
+  screen reader label.
+- Contents: list items with icons, dividers between kinds of actions,
+  thumbnails or images when useful. Scrolls when it does not fit.
+- Compact: full width. From 600dp Flutter caps the width at 640dp. From
+  840dp the same content can open as a **side sheet** at the end edge
+  (`showAdaptiveSheet`).
+- Hand-built: the tap-to-cycle handle, the full-screen app bar and the
+  side sheet (Flutter has no side sheet). Everything else is Flutter's
+  `showModalBottomSheet` and `DraggableScrollableSheet`.
+
 ### Menus
 Source: **m3.material.io/components/menus/guidelines**. Code:
 `lib/core/design/widgets/menus.dart`. Live: playground tab "المدخلات",
@@ -398,6 +428,7 @@ page, and replace it with Flutter's version once it lands.
 | Scroll time picker (inline, keyboard toggle, 12/24h) | `ScrollTimePicker` in `widgets/date_time_fields.dart` | m3.material.io/components/time-pickers/guidelines |
 | Hiding navigation bar, collapsible rail with menu button, modal expanded rail, adaptive shell | `navigation.dart`, composed from the official `NavigationBar`, `NavigationRail`, `Drawer` | m3.material.io/components/navigation-rail/guidelines |
 | Scroll field (snapping wheel, keyboard input, 3 sizes) | `ScrollField` in `widgets/scroll_field.dart`, on the official `ListWheelScrollView` | m3.material.io/components/scroll-fields/guidelines |
+| Bottom sheet handle that cycles heights, full-screen close bar, side sheet | `widgets/sheets.dart`, on the official `showModalBottomSheet` + `DraggableScrollableSheet` | m3.material.io/components/bottom-sheets/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component
