@@ -1,6 +1,6 @@
 # خطة قاعدة البيانات متعددة الشركات (Multi-tenant) — Tashil ERP
 
-> الحالة: مقترح للمراجعة · التاريخ: 2026-11-25
+> الحالة: مقترح للمراجعة · التاريخ: 2026-11-25 · المراجعة الثانية: 2026-11-26 (القسم 9)
 > الملفات المرتبطة: [`tashil-erp.dbml`](./tashil-erp.dbml) (مخطط ER كامل، يتفتح في [dbdiagram.io](https://dbdiagram.io) من Import > DBML)
 
 ## 0. الخلاصة في سطور
@@ -14,6 +14,8 @@
 | تفعيل 5 أو 6 سيستمات بس؟ | جدول `company_modules` + الـ claim `mods`، والـ Rules والتطبيق والداشبورد بيقفلوا أي موديول مش مفعّل |
 | على الجهاز؟ | Drift/SQLite زي ما هو، **ملف قاعدة بيانات منفصل لكل شركة** على الجهاز، وSyncOutbox بيرفع لـ Firestore |
 | التقارير الكبيرة؟ | Cloud Functions بتعمل `daily_summaries`، وبعدين تصدير لـ **BigQuery** للتحليلات الثقيلة |
+| الفلوس والكميات؟ | الفلوس integer بالقرش، والكميات integer (الكمية × 1000) بالوحدة الأساسية، مع وحدات تحويل لكل منتج (كرتونة = 12) |
+| المستندات المالية؟ | ثابتة (create فقط)، والإلغاء والمرتجع مستند جديد. رقم المستند في الفايرستور هو مفتاح منع التكرار |
 | قاعدة منفصلة فعليًا لتاجر معيّن؟ | متاحة كـ "Enterprise tier": Firestore بيسمح بقواعد متعددة في نفس المشروع (حد 100 لكل مشروع)، ونفس الكود يشتغل عليها لأن المسارات واحدة |
 
 **ليه مش Postgres (Cloud SQL / Firebase SQL Connect / Supabase)؟** لأن أهم متطلب عندنا هو **Offline-first على SUNMI**، وFirestore هو الوحيد في منظومة Google اللي فيه offline قراءة وكتابة جاهز ومُدار بالكامل، وبيتوسع لوحده ويبدأ مجاني. Postgres أقوى في التقارير والـ joins، وده بنعوّضه بـ BigQuery. التفاصيل في القسم 2.
@@ -81,7 +83,8 @@ Identity Platform فيه "tenants" بمعنى **مجموعات مستخدمين 
 
 - **الجهاز نفسه** بيتسجل مرة واحدة (Sync & Admin): الأدمن يطلع QR/كود تفعيل من الداشبورد، الجهاز يبعته لـ function `activateDevice`، والـ function ترجّع **custom token** لحساب `device_<id>` فيه claims `{cid, bid, did}`. ده اللي بيعمل sync.
 - **الكاشير** بيدخل على الجهاز بـ **PIN** (الـ hash بتاعه متزامن في `members.pin_hash`)، فالتبديل بين الكاشيرات يشتغل offline، وكل فاتورة متسجل عليها `cashier_uid`.
-- لو الجهاز اتسرق: الأدمن يعمل revoke، الـ function تقفل حساب الجهاز وتلغي التوكن.
+- لو الجهاز اتسرق: الأدمن يعمل revoke، والـ function تعمل 3 حاجات: `devices.status = revoked`، وتقفل حساب `device_<id>` في Auth، وتلغي الـ refresh tokens. والـ Rules بتراجع `status` مع كل كتابة من جهاز (`deviceOk`)، فالجهاز بيتقفل فورًا حتى لو التوكن بتاعه لسه صالح لمدة ساعة.
+- الحقل `status` بتكتبه الـ function بس، والجهاز ميقدرش يغيّره.
 
 ---
 
@@ -92,42 +95,105 @@ Identity Platform فيه "tenants" بمعنى **مجموعات مستخدمين 
 /platform/plans/{planId}
 /platformAdmins/{uid}
 /users/{uid}                            ← بروفايل عام للشخص
+  /companies/{cid}                      ← نسخة من العضوية عشان "شركاتي" تبقى query واحدة (Functions بس)
 
-/companies/{cid}                        ← بيانات الشركة + status + planId
+/companies/{cid}                        ← بيانات الشركة + status + timezone
+  /subscription/current                 ← الباقة والحدود
   /modules/{moduleId}                   ← enabled, expiresAt, settings
   /branches/{branchId}
   /roles/{roleId}                       ← permissions: ["pos.sell","pos.refund",...]
   /members/{uid}                        ← roleId, branchIds, pinHash, status
-  /devices/{deviceId}                   ← invoicePrefix, lastPulledAt, status
+  /devices/{deviceId}                   ← invoicePrefix, status, syncCursors
   /counters/{key}
   /auditLogs/{id}
 
-  /categories/{id}  /units/{id}  /products/{id}  /productBarcodes/{id}       ← Products
-  /stockMovements/{id}  /stockLevels/{branchId_productId}                    ← Inventory
-  /customers/{id}  /suppliers/{id}                                           ← Customers & Suppliers
-  /purchases/{id}        (items جوه الـ document كـ array)                    ← Receiving
-  /sales/{id}            (items + payments جوه الـ document)                   ← POS
-  /shifts/{id}  /cashMovements/{id}                                          ← Cash drawer & Shifts
-  /accountEntries/{id}                                                       ← Credit accounts
-  /expenseCategories/{id}  /expenses/{id}                                    ← Expenses
-  /eta/settings  /etaDocuments/{id}                                          ← ETA e-invoice
-  /dailySummaries/{branchId_yyyyMMdd}                                        ← Reports (Functions بس تكتب)
+  /categories/{id}  /units/{id}  /products/{id} (units[] جواه)                 ← Products
+  /productBarcodes/{barcode}  /productBranchPrices/{branchId_productId_unitId}
+  /stockMovements/{sourceType_sourceId_lineNo}  /stockLevels/{branchId_productId} ← Inventory
+  /stockTransfers/{id} (items[] جواه)  /stockCounts/{id}/items/{productId}
+  /customers/{id}  /suppliers/{id}                                            ← Customers & Suppliers
+  /purchases/{id}/items/{lineNo}                                              ← Receiving
+  /sales/{invoiceNo} (items[] + payments[] جواه)                               ← POS
+  /saleReturns/{returnNo} (items[] جواه)
+  /shifts/{id}  /cashMovements/{id}                                           ← Cash drawer & Shifts
+  /vouchers/{id}  /accountEntries/{sourceType_sourceId}                       ← Credit accounts
+  /expenseCategories/{id}  /expenses/{id}                                     ← Expenses
+  /eta/settings  /etaDocuments/{internalId}                                   ← ETA e-invoice
+  /dailySummaries/{branchId_yyyyMMdd}                                         ← Reports
 ```
 
-قواعد التصميم:
-1. **الـ document id = الـ `localUuid`** اللي اتولّد على الجهاز (UUIDv7 عشان يترتب زمنيًا). إعادة إرسال نفس العنصر من الـ outbox مش بتكرره.
-2. **collections مسطحة تحت الشركة** (مش متداخلة تحت الفرع). الفرع عبارة عن field `branchId`، عشان تقارير الشركة كلها تبقى query واحدة.
-3. **بنود الفاتورة جوه الفاتورة** (array) بدل subcollection: قراءة واحدة بدل N، والفاتورة بعيدة جدًا عن حد الـ 1 MiB.
-4. **الأرقام المشتقة** (`stockLevels`, أرصدة العملاء والموردين, `dailySummaries`) بتحسبها **Cloud Functions** من الحركات (append-only). الأجهزة ممنوع تكتبها. ده بيحل مشكلة جهازين بيبيعوا نفس المنتج في نفس الوقت من غير تعارض.
-5. كل document فيه: `createdAt`, `updatedAt` (server timestamp), `createdBy`, `deviceId`, `version`.
+> الـ DBML فيه 44 جدول منطقي. الجداول اللي مكتوب عليها embedded (زي `sale_items` و`sale_payments` و`product_units`) متخزنة كـ array جوه المستند الأب، فعدد الـ collections الفعلي أقل.
 
-### المزامنة (Drift ⇄ Firestore)
+### 3.1 المفاتيح ومنع التكرار (idempotency)
 
-- **Push:** الـ SyncOutbox بيبعت batches (لحد 500 عملية) بـ `set(merge)` على `/companies/{cid}/{collection}/{localUuid}`. الـ Rules بتتأكد إن `cid` مطابق للتوكن وإن الموديول مفعّل.
-- **Pull:** لكل collection: `where updatedAt > lastPulledAt order by updatedAt limit 500`، والـ cursor يتحفظ في Drift (ومنه نسخة في `devices/{id}.lastPulledAt` للمتابعة). الجهاز بيسحب بيانات فرعه بس (`where branchId == bid`) للجداول الكبيرة.
-- **التعارض:** الكتالوج (منتجات/أسعار) = last-writer-wins بالـ `updatedAt` والـ `version`. الحركات المالية والمخزنية append-only فمفيش تعارض.
-- إحنا **مش محتاجين** Firestore offline cache على الـ POS لأن Drift هو مصدر الحقيقة المحلي؛ الـ Angular dashboard بيستخدم Firestore realtime عادي.
+الفايرستور **ملوش قيد UNIQUE**، فالحاجة اللي لازم تبقى فريدة لازم تبقى هي نفسها **رقم المستند**:
+
+| المستند | رقم المستند (document id) | ليه |
+|---|---|---|
+| أي مستند بيعمله الجهاز (عميل، وردية، سند، مصروف…) | `localUuid` (UUIDv7) اللي اتعمل على الجهاز | إعادة الرفع بعد ما النت يقطع بتكتب على نفس المستند |
+| فاتورة البيع | `invoiceNo` = `DEVICE-yyyyMMdd-NNNN` | رقم الفاتورة مستحيل يتكرر، والـ prefix بتاع الجهاز بيتحجز من `counters` ومبيرجعش تاني حتى لو التطبيق اتمسح |
+| المرتجع | `returnNo` = `DEVICE-yyyyMMdd-R-NNNN` | نفس الفكرة |
+| الباركود | الباركود نفسه | الباركود مستحيل يبقى على منتجين |
+| حركة المخزون | `{sourceType}_{sourceId}_{lineNo}` | الحركة مشتقة من سطر مستند، فإعادة الكتابة مبتعملش حركة تانية |
+| قيد الحساب | `{sourceType}_{sourceId}` | الفاتورة أو السند يتقيد مرة واحدة بس، حتى لو الـ Function اشتغلت مرتين |
+| مستند الضرائب | `internalId` (رقم الفاتورة أو المرتجع) | إرسال واحد لكل مستند |
+
+الـ Rules بتسمح بـ `create` بس على المستندات المالية، فلو مستند موجود فعلًا، إعادة الرفع بتترفض بدل ما تعدّل. والـ outbox بيعتبر الرفض ده نجاح لأن المستند وصل قبل كده.
+
+### 3.2 قواعد التصميم
+
+1. **collections مسطحة تحت الشركة** (مش متداخلة تحت الفرع). الفرع عبارة عن field `branchId`، عشان تقارير الشركة كلها تبقى query واحدة.
+2. **بنود فاتورة الـ POS جوه الفاتورة** (array): قراءة واحدة بدل N، والفاتورة بعيدة جدًا عن حد الـ 1 MiB. **بنود الاستلام والجرد subcollection** لأن إذن الاستلام ممكن يبقى فيه مئات السطور.
+3. **المستندات المالية ثابتة (immutable):** الفاتورة والمرتجع والسند والمصروف وحركة المخزون والقيد بيتعملوا `create` بس. الإلغاء مستند جديد بيعكس الأول (`sale_returns` بنوع `void`، أو voucher/expense بـ `void_of_id`). المشتريات بتتعدل وهي `draft` بس، وبعد الـ `posted` مبتتعدلش.
+4. **snapshot على السطر:** كل سطر فاتورة شايل اسم المنتج والوحدة ومعامل التحويل وسعر التكلفة وكود ETA ونوع الضريبة ونسبتها وقت البيع. والفاتورة شايلة `buyer_snapshot` (النوع، الاسم، الرقم الضريبي، الرقم القومي، العنوان). لو المنتج أو العميل اتعدل بعدين، الفاتورة ومستند الضرائب مبيتغيروش.
+5. **الكميات أرقام صحيحة:** كل كمية متخزنة `quantity_milli` = الكمية × 1000 بوحدة المنتج الأساسية (1.5 كيلو = 1500، 12 قطعة = 12000). الفايرستور بيخزن الأرقام الصحيحة int64 بالظبط، أما الكسور فبيخزنها float، ودي بتغلط في الجمع (0.1 + 0.2).
+6. **الوحدات:** `units` فيها الوحدة الأساسية بس (قطعة، كيلو، لتر). كل منتج عنده `product_units` (قطعة، علبة 6، كرتونة 12) بـ `factor_milli`، وكل وحدة ممكن يبقى ليها باركود وسعر. الاستلام بالكرتونة والبيع بالقطعة: سطر الاستلام بيتسجل بالكرتونة، وحركة المخزون بتتسجل بالكمية × المعامل بالوحدة الأساسية.
+7. **مين بيكتب إيه:** كل جدول في الـ DBML عليه `writer:` (client أو function أو admin)، والـ Rules بتطبّقها. الأرقام المشتقة (`stockLevels`، أرصدة العملاء والموردين، `expected_cash` في الوردية، `dailySummaries`، `returned_total`) بتكتبها **Cloud Functions بس**.
+8. كل document فيه `createdAt` و`updatedAt` (server timestamp، **إجباري**) و`createdBy` و`deviceId`.
+
+### 3.3 الدرج والوردية (من غير ما حاجة تتحسب مرتين)
+
+`cash_movements` فيها **إيداع وسحب يدوي بس** (`cash_in | cash_out`: فكّة، توريد للخزنة، سحب صاحب المحل). المبيعات والمرتجعات والسندات والمصروفات بتتقري من جداولها. عند قفل الوردية، الـ Function بتحسب:
+
+```
+expected_cash = opening_cash
+              + مدفوعات cash في sales (shift_id = الوردية)
+              - مرتجعات refund_method = cash في sale_returns
+              + سندات قبض cash في vouchers
+              - سندات صرف cash في vouchers
+              - مصروفات مدفوعة من الدرج (expenses.shift_id)
+              + cash_in - cash_out
+difference    = counted_cash - expected_cash
+```
+
+### 3.4 الآجل والسندات
+
+- البيع الآجل: `sale_payments.method = credit` → الـ Function تكتب `accountEntries/SALE_{invoiceNo}` (مدين على العميل).
+- العميل دفع 500 على الحساب: **سند قبض** في `vouchers` (`kind = receipt`, `customer_id`) → `accountEntries/VOUCHER_{id}` (دائن).
+- سددنا لمورد: **سند صرف** (`kind = payment`, `supplier_id`).
+- القيد عليه `customer_id` أو `supplier_id` (واحد بس منهم)، مش `party_id` عام، عشان كل قيد يبقى مربوط بجدوله.
+- رقم القيد مشتق من مصدره، فمستحيل يتقيد مرتين.
+
+### 3.5 المرتجع والإلغاء
+
+- **إلغاء فاتورة كاملة** = `sale_returns` بنوع `void` فيه كل السطور.
+- **مرتجع جزئي** (الحالة العادية في المحل) = `sale_returns` بنوع `return`، وكل سطر شايل `sale_line_no` بيشاور على سطر الفاتورة الأصلي. الـ Function بترفض المرتجع لو الكمية أكبر من المباع ناقص اللي اترجع قبل كده.
+- المرتجع بيعمل حركة مخزون `SALE_RETURN` (إلا لو البضاعة تالفة: `restock = false`)، وقيد لو كان آجل، ومستند ضرائب `return_receipt` شايل `original_eta_uuid`.
+
+### 3.6 التحويل بين الفروع والجرد
+
+- **تحويل:** `stock_transfers` من فرع لفرع. عند الإرسال بتتعمل حركات `TRANSFER_OUT` في الفرع المرسل، وعند الاستلام حركات `TRANSFER_IN` في الفرع المستلم بالكمية اللي وصلت فعلًا. لو فيه عجز، بيفضل ظاهر في `received_quantity_milli`.
+- **حركة المخزون ليها شكل واحد:** `quantity_milli` بإشارة (+ دخول، − خروج)، والسبب في `source_type`. مفيش عمود IN/OUT منفصل.
+- **الجرد:** `stock_counts` مستند جرد له جلسة. كل سطر شايل الكمية المتوقعة وقت العد والكمية الفعلية، وعند الترحيل بتتعمل حركات `COUNT` بالفرق. التسوية اليدوية من غير جرد مش موجودة، عشان أي تعديل في المخزون يبقى له مستند يتراجع.
+
+### 3.7 المزامنة (Drift ⇄ Firestore)
+
+- **Push:** الـ SyncOutbox بيبعت batches (لحد 500 عملية). الفاتورة وحركات المخزون بتاعتها في نفس الـ batch. الـ Rules بتتأكد إن `cid` مطابق للتوكن، وإن الموديول مفعّل، وإن الجهاز لسه `active`.
+- **Pull:** لكل collection فيه **cursor منفصل**: `where updatedAt > cursor[collection] order by updatedAt limit 500`. الـ cursors محفوظة في Drift، ومنها نسخة في `devices/{id}.syncCursors` للدعم الفني. وبما إن `updatedAt` بقى إجباري على كل الماستر، الـ cursor بقى موثوق. الجهاز بيسحب بيانات فرعه بس (`where branchId == bid`) للجداول الكبيرة.
+- **التعارض:** الكتالوج (منتجات وأسعار) = last-writer-wins بالـ `updatedAt`. المستندات المالية والمخزنية create-only فمفيش تعارض.
+- إحنا **مش محتاجين** Firestore offline cache على الـ POS لأن Drift هو مصدر الحقيقة المحلي. الـ Angular dashboard بيستخدم Firestore realtime عادي.
 - على الجهاز: ملف Drift منفصل لكل شركة (`tashil_{cid}.sqlite`)، فلو الجهاز اتنقل لشركة تانية مفيش خلط.
+- **يوم التقرير:** `dailySummaries` بيتقسم على يوم الشركة بتوقيتها (`companies.timezone` = Africa/Cairo)، مش UTC، عشان فاتورة 1 بالليل بتوقيت القاهرة متتحسبش على اليوم اللي قبله.
 
 ---
 
@@ -182,18 +248,23 @@ service cloud.firestore {
       match /modules/{m}   { allow read: if inCompany(cid) || superAdmin(); allow write: if superAdmin(); }
       match /members/{uid} { allow read: if inCompany(cid); allow write: if false; } // via Functions only
 
-      match /sales/{id} {
+      // A revoked device is locked out immediately, not when its token expires
+      function deviceOk(cid) {
+        return request.auth.token.role != 'device'
+            || get(/databases/$(db)/documents/companies/$(cid)/devices/$(request.auth.token.did)).data.status == 'active';
+      }
+
+      match /sales/{invoiceNo} {
         allow read:   if inCompany(cid) && hasModule('pos');
-        allow create: if inCompany(cid) && hasModule('pos')
+        allow create: if inCompany(cid) && hasModule('pos') && deviceOk(cid)
                       && inBranch(request.resource.data.branchId)
-                      && request.resource.data.total is int;
-        allow update: if inCompany(cid) && hasModule('pos')
-                      && request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['status','updatedAt','version','cancelReason']);
-        allow delete: if false;
+                      && request.resource.data.total is int
+                      && !('returnedTotal' in request.resource.data);
+        allow update, delete: if false;   // immutable; returns are saleReturns documents
       }
 
       match /stockLevels/{id}    { allow read: if inCompany(cid) && hasModule('inventory'); allow write: if false; }
+      match /accountEntries/{id} { allow read: if inCompany(cid) && hasModule('credit');    allow write: if false; }
       match /dailySummaries/{id} { allow read: if inCompany(cid) && hasModule('reports');   allow write: if false; }
       // ... same pattern for the other module collections
     }
@@ -207,224 +278,290 @@ service cloud.firestore {
 
 ## 5. مخطط ER
 
-المخطط الكامل (كل الجداول والأعمدة) في [`tashil-erp.dbml`](./tashil-erp.dbml). الرسم تحت مقسوم لجزئين عشان يتقري.
+المخطط الكامل (كل الجداول والأعمدة ومين بيكتب كل جدول) في [`tashil-erp.dbml`](./tashil-erp.dbml). الرسم تحت مقسوم لـ 3 أجزاء عشان يتقري، وفيه بس الأعمدة المهمة.
 
 ### 5.1 المنصة والـ Core
 
 ```mermaid
 erDiagram
-    PLANS ||--o{ COMPANIES : "subscribes"
+    PLANS ||--o{ SUBSCRIPTIONS : "priced by"
+    COMPANIES ||--|| SUBSCRIPTIONS : "has"
     MODULES ||--o{ COMPANY_MODULES : "enabled as"
     COMPANIES ||--o{ COMPANY_MODULES : "has"
     COMPANIES ||--o{ BRANCHES : "has"
     COMPANIES ||--o{ ROLES : "defines"
     COMPANIES ||--o{ MEMBERS : "employs"
     USERS ||--o{ MEMBERS : "is"
+    USERS ||--o{ USER_COMPANIES : "mirror"
     ROLES ||--o{ MEMBERS : "grants"
     BRANCHES ||--o{ DEVICES : "hosts"
-    COMPANIES ||--o{ DEVICES : "owns"
     COMPANIES ||--o{ AUDIT_LOGS : "records"
 
     COMPANIES {
         string id PK
         string legal_name
         string tax_registration_no
+        string status
+        string timezone
+    }
+    SUBSCRIPTIONS {
+        string company_id PK
         string plan_id FK
         string status
+        date period_end
+    }
+    PLANS {
+        string id PK
+        int max_branches
+        int max_devices
     }
     MODULES {
         string id PK
         string name_ar
-        list depends_on
     }
     COMPANY_MODULES {
         string company_id PK
         string module_id PK
         bool enabled
-        timestamp expires_at
     }
     BRANCHES {
         string id PK
-        string company_id FK
         string code
     }
     ROLES {
         string id PK
-        string company_id FK
         list permissions
     }
     USERS {
         string uid PK
-        string display_name
+    }
+    USER_COMPANIES {
+        string uid PK
+        string company_id PK
     }
     MEMBERS {
         string company_id PK
         string uid PK
         string role_id FK
-        list branch_ids
         string pin_hash
     }
     DEVICES {
         string id PK
-        string branch_id FK
         string invoice_prefix
-        timestamp last_pulled_at
-    }
-    PLANS {
-        string id PK
-        list included_modules
+        string status "active or revoked"
     }
     AUDIT_LOGS {
         string id PK
         string action
-        timestamp at
     }
 ```
 
-### 5.2 بيانات الموديولات (كلها تحت `companies/{cid}`)
+### 5.2 المنتجات والمخزون
 
 ```mermaid
 erDiagram
+    UNITS ||--o{ PRODUCTS : "base unit"
     CATEGORIES ||--o{ PRODUCTS : "groups"
-    PRODUCTS ||--o{ PRODUCT_BARCODES : "has"
-    PRODUCTS ||--o{ STOCK_MOVEMENTS : "moves"
-    PRODUCTS ||--o{ STOCK_LEVELS : "per branch"
+    PRODUCTS ||--|{ PRODUCT_UNITS : "sold or bought as"
+    PRODUCTS ||--o{ PRODUCT_BARCODES : "scanned by"
+    PRODUCT_UNITS ||--o{ PRODUCT_BARCODES : "pack barcode"
+    PRODUCTS ||--o{ PRODUCT_BRANCH_PRICES : "branch price"
+    PRODUCTS ||--o{ STOCK_MOVEMENTS : "ledger"
+    PRODUCTS ||--o{ STOCK_LEVELS : "balance per branch"
+    STOCK_TRANSFERS ||--|{ STOCK_TRANSFER_ITEMS : "contains"
+    STOCK_COUNTS ||--|{ STOCK_COUNT_ITEMS : "contains"
     SUPPLIERS ||--o{ PURCHASES : "supplies"
     PURCHASES ||--|{ PURCHASE_ITEMS : "contains"
-    PRODUCTS ||--o{ PURCHASE_ITEMS : "received as"
-    CUSTOMERS ||--o{ SALES : "buys"
-    SHIFTS ||--o{ SALES : "during"
-    SALES ||--|{ SALE_ITEMS : "contains"
-    SALES ||--|{ SALE_PAYMENTS : "paid by"
-    PRODUCTS ||--o{ SALE_ITEMS : "sold as"
-    SHIFTS ||--o{ CASH_MOVEMENTS : "has"
-    CUSTOMERS ||--o{ ACCOUNT_ENTRIES : "ledger"
-    SUPPLIERS ||--o{ ACCOUNT_ENTRIES : "ledger"
-    EXPENSE_CATEGORIES ||--o{ EXPENSES : "groups"
-    SHIFTS ||--o{ EXPENSES : "paid from"
-    SALES ||--o| ETA_DOCUMENTS : "reported as"
 
     PRODUCTS {
         string id PK
-        string category_id FK
-        string name
-        int cost_price "piasters"
-        int selling_price "piasters"
+        string base_unit_id FK
+        int selling_price "piasters per base unit"
         int vat_rate_bp
+        string eta_item_code
+    }
+    UNITS {
+        string id PK
+        int decimals
+    }
+    CATEGORIES {
+        string id PK
+    }
+    PRODUCT_UNITS {
+        string id PK
+        string name "carton"
+        int factor_milli "12000"
+    }
+    PRODUCT_BARCODES {
+        string barcode PK "doc id"
+        string product_unit_id FK
+    }
+    PRODUCT_BRANCH_PRICES {
+        string branch_id PK
+        string product_id PK
+        int selling_price
     }
     STOCK_MOVEMENTS {
-        string id PK
-        string branch_id FK
-        string product_id FK
-        string type "IN OUT ADJUST"
-        decimal quantity
-        string reference_type
+        string id PK "source_line"
+        int quantity_milli "signed"
+        string source_type
+        string source_id
     }
     STOCK_LEVELS {
         string branch_id PK
         string product_id PK
-        decimal quantity "Functions only"
+        int quantity_milli "function only"
     }
-    SALES {
+    STOCK_TRANSFERS {
         string id PK
-        string branch_id FK
-        string device_id FK
-        string shift_id FK
-        string invoice_no
-        int total "piasters"
+        string from_branch_id FK
+        string to_branch_id FK
         string status
     }
+    STOCK_TRANSFER_ITEMS {
+        int quantity_milli
+        int received_quantity_milli
+    }
+    STOCK_COUNTS {
+        string id PK
+        string status
+    }
+    STOCK_COUNT_ITEMS {
+        int expected_quantity_milli
+        int counted_quantity_milli
+    }
+    SUPPLIERS {
+        string id PK
+    }
+    PURCHASES {
+        string id PK
+        string status "draft posted voided"
+        int tax
+        int total
+    }
+    PURCHASE_ITEMS {
+        string unit_name "snapshot"
+        int unit_factor_milli
+        int quantity_milli
+        int unit_cost
+    }
+```
+
+### 5.3 البيع والدرج والآجل والضرائب
+
+```mermaid
+erDiagram
+    CUSTOMERS ||--o{ SALES : "buys"
+    SHIFTS ||--o{ SALES : "during"
+    SALES ||--|{ SALE_ITEMS : "lines"
+    SALES ||--|{ SALE_PAYMENTS : "paid by"
+    SALES ||--o{ SALE_RETURNS : "reversed by"
+    SALE_RETURNS ||--|{ SALE_RETURN_ITEMS : "lines"
+    SALE_ITEMS ||--o{ SALE_RETURN_ITEMS : "returned from"
+    SHIFTS ||--o{ CASH_MOVEMENTS : "manual in out"
+    SHIFTS ||--o{ SALE_RETURNS : "refunded in"
+    SHIFTS ||--o{ VOUCHERS : "cash through"
+    SHIFTS ||--o{ EXPENSES : "paid from"
+    CUSTOMERS ||--o{ VOUCHERS : "receipt"
+    SUPPLIERS ||--o{ VOUCHERS : "payment"
+    CUSTOMERS ||--o{ ACCOUNT_ENTRIES : "ledger"
+    SUPPLIERS ||--o{ ACCOUNT_ENTRIES : "ledger"
+    SALES ||--o| ETA_DOCUMENTS : "receipt"
+    SALE_RETURNS ||--o| ETA_DOCUMENTS : "return receipt"
+
+    SALES {
+        string invoice_no PK "doc id"
+        string shift_id FK
+        json buyer_snapshot
+        int total
+        int returned_total "function only"
+    }
     SALE_ITEMS {
-        string product_id FK
-        string product_name "snapshot"
-        decimal quantity
+        int line_no
+        string unit_name "snapshot"
+        string eta_item_code "snapshot"
+        int vat_rate_bp "snapshot"
+        int quantity_milli
         int unit_price
         int cost_price
     }
     SALE_PAYMENTS {
-        string method
+        string method "cash card wallet credit"
         int amount
     }
-    PURCHASES {
-        string id PK
-        string supplier_id FK
-        int total
-        string status
+    SALE_RETURNS {
+        string return_no PK "doc id"
+        string invoice_no FK
+        string kind "void or return"
+        string refund_method
     }
-    PURCHASE_ITEMS {
-        string product_id FK
-        decimal quantity
-        int unit_cost
+    SALE_RETURN_ITEMS {
+        int sale_line_no
+        int quantity_milli
+        bool restock
     }
     SHIFTS {
         string id PK
-        string cashier_uid
         int opening_cash
+        int expected_cash "function"
         int counted_cash
-        string status
     }
     CASH_MOVEMENTS {
         string id PK
-        string type
+        string type "cash_in or cash_out"
+        int amount
+    }
+    VOUCHERS {
+        string id PK
+        string kind "receipt or payment"
+        string customer_id FK
+        string supplier_id FK
         int amount
     }
     ACCOUNT_ENTRIES {
-        string id PK
-        string party_type
-        string party_id
+        string id PK "source_type_source_id"
+        string customer_id FK
+        string supplier_id FK
         int debit
         int credit
     }
     EXPENSES {
         string id PK
-        string category_id FK
         int amount
     }
     ETA_DOCUMENTS {
-        string id PK
-        string sale_id FK
-        string eta_uuid
+        string internal_id PK
+        string original_eta_uuid
+        string signed_payload_path
         string status
     }
     CUSTOMERS {
         string id PK
-        string name
-        int credit_limit
+        json address
+        int balance "function only"
     }
     SUPPLIERS {
         string id PK
-        string name
-    }
-    CATEGORIES {
-        string id PK
-        string name
-    }
-    PRODUCT_BARCODES {
-        string barcode
-        decimal pack_qty
-    }
-    EXPENSE_CATEGORIES {
-        string id PK
-        string name
+        int balance "function only"
     }
 ```
 
-### 5.3 مين بيملك إيه
+### 5.4 مين بيكتب إيه
 
-| الموديول | Collections | بيكتبها مين |
-|---|---|---|
-| Core | companies, modules, branches, roles, members, counters | السوبر أدمن / Owner عن طريق Functions |
-| Sync & Admin | devices, auditLogs | Functions + الأجهزة (heartbeat) |
-| Products | categories, units, products, productBarcodes | Owner/Manager (داشبورد أو جهاز) |
-| Inventory | stockMovements (أجهزة)، stockLevels (Functions) | |
-| Receiving | purchases | الأجهزة/الداشبورد، والحركات المخزنية معاها |
-| POS | sales | الأجهزة |
-| Customers & Suppliers | customers, suppliers | الأجهزة/الداشبورد |
-| Cash drawer & Shifts | shifts, cashMovements | الأجهزة |
-| Credit accounts | accountEntries (append-only)، الرصيد في customers/suppliers بالـ Functions | |
-| Expenses | expenseCategories, expenses | الأجهزة/الداشبورد |
-| ETA e-invoice | eta/settings (Owner)، etaDocuments (Functions بس) | |
-| Reports | dailySummaries (Functions بس) + BigQuery | |
+| الموديول | Collections | client (الجهاز أو الداشبورد) | function فقط |
+|---|---|---|---|
+| Core | companies, subscription, modules, branches, roles, members, counters | بيانات الشركة (Owner) | الشركة الجديدة، الاشتراك، الموديولات، الأعضاء، الأدوار، العدادات |
+| Sync & Admin | devices, auditLogs | heartbeat و syncCursors | التفعيل، الإلغاء، السجل |
+| Products | categories, units, products, productBarcodes, productBranchPrices | كله | متوسط التكلفة |
+| Inventory | stockMovements, stockTransfers, stockCounts | حركات البيع مع الفاتورة، التحويل، الجرد | stockLevels، حركات المرتجع والاستلام |
+| Receiving | purchases | المسودة والترحيل | حركات المخزون وقيد المورد |
+| POS | sales, saleReturns | create فقط | returnedTotal، التحقق من كمية المرتجع |
+| Customers & Suppliers | customers, suppliers | البيانات | balance |
+| Cash drawer & Shifts | shifts, cashMovements | فتح وقفل، إيداع وسحب يدوي | expectedCash و difference |
+| Credit accounts | vouchers, accountEntries | السندات (create فقط) | القيود كلها |
+| Expenses | expenseCategories, expenses | create فقط | |
+| ETA e-invoice | eta/settings, etaDocuments | الإعدادات (Owner) | الإرسال والحالة |
+| Reports | dailySummaries | | كله |
 
 ---
 
@@ -446,7 +583,7 @@ erDiagram
 - **مشاريع منفصلة للبيئات:** `tashil-dev`، `tashil-staging`، `tashil-prod`. الـ multi-tenancy جوه كل مشروع، مش مشروع لكل تاجر.
 - **App Check** مفعّل على Firestore والـ Functions عشان محدش يكلم الـ API من برا التطبيق.
 - **Backups:** Firestore scheduled backups يومي + PITR (point-in-time recovery) للإنتاج.
-- **Indexes مطلوبة:** `(branchId, updatedAt)` و`(updatedAt)` لكل collection بيتعملها pull، `(branchId, date)` لـ sales وexpenses، `(partyId, createdAt)` لـ accountEntries.
+- **Indexes مطلوبة:** `(branchId, updatedAt)` و`(updatedAt)` لكل collection بيتعملها pull، `(branchId, date)` لـ sales وexpenses، `(customerId, createdAt)` و`(supplierId, createdAt)` لـ accountEntries، `(shiftId)` لـ sales وsaleReturns وvouchers وexpenses وcashMovements.
 - **Hot documents:** أي document بيتكتب كتير (زي counters أو stockLevels لمنتج بيتباع جدًا) يتحدّث من Function بـ `FieldValue.increment`. ترقيم الفواتير بيتم على الجهاز (`DEVICE-yyyyMMdd-NNNN`) فمش محتاج counter مركزي.
 - **التكلفة:** أكبر بند هو عدد الـ reads/writes. البنود جوه الفاتورة، والـ pull بـ cursor، والـ summaries الجاهزة للداشبورد بيقللوا ده جدًا. نراجع الأرقام بعد pilot على 2-3 تجار.
 - **الأسرار:** مفاتيح ETA والـ service accounts في Secret Manager فقط. Firestore بيحفظ اسم الـ secret بس.
@@ -455,13 +592,33 @@ erDiagram
 
 ## 8. خطوات التنفيذ المقترحة
 
-1. إضافة `companyId` و`branchId` و`deviceId` لـ `SyncColumns` في Drift، وتغيير الـ PK في الـ sync لـ `localUuid` (UUIDv7)، وملف DB لكل شركة.
+1. تعديل Drift (PR #1): `companyId` و`branchId` و`deviceId` في `SyncColumns`، الكميات `int` (× 1000) بدل `real`، جداول الوحدات والمرتجعات والسندات، والفاتورة create-only، وملف DB لكل شركة.
 2. مشروع Firebase (`tashil-dev`) + Firestore Native + Auth + App Check.
-3. Cloud Functions: `createCompany`, `setCompanyModules`, `inviteMember`, `setMemberRole`, `activateDevice`, `switchCompany` + triggers: stockLevels, balances, dailySummaries, auditLogs.
+3. Cloud Functions: `createCompany`, `setCompanyModules`, `inviteMember`, `setMemberRole`, `activateDevice`, `revokeDevice`, `switchCompany` + triggers: stockLevels, account entries و balances, التحقق من المرتجع, expectedCash للوردية, dailySummaries, auditLogs، وفرض حدود الباقة.
 4. `firestore.rules` كاملة + **اختبارات Rules بالـ Emulator** (أهم اختبار: مستخدم شركة A ميقدرش يقرا أي حاجة من شركة B).
 5. Sync push/pull في Flutter على الـ outbox الموجود.
 6. Angular: شاشات السوبر أدمن (الشركات والموديولات) وشاشات الـ Owner (المستخدمين والأدوار والأجهزة).
 7. BigQuery export + أول تقارير.
+
+---
+
+## 9. سجل المراجعة (2026-11-26)
+
+التعديلات دي جت من مراجعة خارجية للخطة الأولى:
+
+| الملاحظة | التعديل |
+|---|---|
+| الدرج بيتحسب مرتين | `cash_movements` بقت `cash_in | cash_out` بس، و`expected_cash` بيتحسب من مصادره (القسم 3.3) |
+| الكميات decimal بتتخزن float | كل الكميات بقت `*_milli` integer، وفيه `product_units` بمعامل تحويل وباركود وسعر لكل وحدة |
+| مفيش سند قبض وصرف | جدول `vouchers`، والقيود رقمها مشتق من مصدرها، و`customer_id` و`supplier_id` بدل `party_id` |
+| الفاتورة بتتعدل، والمرتجع الجزئي مش موجود | `sales` بقت immutable ورقمها هو `invoice_no`، و`sale_returns` + `sale_return_items` بيشاوروا على سطر الفاتورة |
+| snapshot الضرائب | السطر شايل الوحدة وكود ETA ونوع الضريبة، والفاتورة شايلة `buyer_snapshot`، و`eta_documents` شايل `original_eta_uuid` ومسار الـ payload الموقّع |
+| التكرار في الأوفلاين | القسم 3.1: رقم المستند هو المفتاح، والحركات والقيود ليها أرقام مشتقة |
+| التحويل مش موجود، وsigned مع IN/OUT | `stock_transfers`، والحركة بقت كمية بإشارة + `source_type` |
+| مين بيكتب الرصيد | `writer:` على كل جدول في الـ DBML، والقسم 5.4 |
+| الـ PK بيظهر nullable في الخريطة | اتصلّح في الصفحة التفاعلية |
+| أسعار الفروع، الجرد، مسودة وضريبة المشتريات، حجم المستند، الـ cursor، شركات المستخدم، الاشتراك، عنوان العميل، يوم التقرير | `product_branch_prices`، `stock_counts`، `purchases.status = draft | posted | voided` وضريبة على السطر، بنود الاستلام subcollection، cursor لكل collection و`updated_at` إجباري، `user_companies`، `subscriptions` + counters، `customers.address`، اليوم بتوقيت الشركة |
+| توكن الجهاز | `deviceOk()` في الـ Rules + قفل حساب الجهاز وإلغاء الـ refresh tokens |
 
 ---
 
