@@ -1,0 +1,932 @@
+// Tashil ERP - multi-tenant logical data model (rev 2, 2026-11-26)
+// Import into https://dbdiagram.io (Import > DBML) to get the full ER diagram.
+//
+// Storage
+// - Platform tables (modules, plans, platform_admins, users, user_companies) live
+//   OUTSIDE any tenant. Every other table lives under /companies/{company_id}/...
+// - Tables whose note says "embedded" are arrays inside their parent document;
+//   "subcollection" means /parent/{id}/<name>/{line}. So the table count is the
+//   logical model, not the number of Firestore collections.
+//
+// Keys and idempotency (Firestore has no UNIQUE constraint)
+// - The Firestore document id IS the idempotency key. Every document created on a
+//   device gets a ULID minted once, inside the local commit, and reused on every
+//   retry. See docs/database/sync-strategy.md section 10.
+// - Human numbers that must be unique (invoice_no, return_no) are guarded by
+//   document_numbers/{number}, claimed in the same server transaction.
+// - Natural keys that are the id: product_barcodes/{barcode}, eta_documents/{internal_id}.
+// - Derived rows use deterministic ids built from their source:
+//   stock_movements/{source_type}_{source_id}_{line_no}
+//   account_entries/{source_type}_{source_id}
+//   so a Function that runs twice writes the same document twice, not two documents.
+//
+// Numbers
+// - Money: integer piasters (bigint). Tax rates: basis points (1400 = 14%).
+// - Quantities: integer thousandths of the product's base unit (*_milli, bigint).
+//   1.5 kg = 1500, 12 pcs = 12000. Never float.
+//
+// Mutability
+// - Financial documents (sales, sale_returns, purchases once posted, vouchers,
+//   expenses, stock movements, account entries, audit logs) are append-only:
+//   clients create them and never update them. A cancel is a new document.
+// - Every table note starts with "writer:" = who may write it
+//   (client = POS / dashboard user, function = Cloud Functions only, admin = super admin).
+// - Every business document carries created_at, updated_at (mandatory, server time),
+//   created_by, device_id. Pull sync uses updated_at per collection.
+
+Project tashil_erp {
+  database_type: 'Firestore (logical model, PostgreSQL-flavoured DBML)'
+  Note: 'One logical database per company (tenant). 11 modules share it. See docs/database/multi-tenant-plan.md'
+}
+
+//////////////////////////////////////////////////////////////
+// PLATFORM (owned by Tashil, outside any tenant)
+//////////////////////////////////////////////////////////////
+
+TableGroup platform {
+  modules
+  plans
+  platform_admins
+  users
+  user_companies
+}
+
+Table modules {
+  Note: 'writer: admin. Platform table, /platform/modules/{id}'
+  id varchar [pk, note: 'core, products, inventory, receiving, pos, reports, parties, sync_admin, cash_shifts, credit, expenses, eta']
+  name_ar varchar [not null]
+  name_en varchar [not null]
+  depends_on "varchar[]" [note: 'e.g. pos -> products, inventory']
+  is_core boolean [not null, default: false, note: 'core is always enabled']
+}
+
+Table plans {
+  Note: 'writer: admin. Platform table'
+  id varchar [pk]
+  name varchar [not null]
+  included_modules "varchar[]" [not null]
+  max_branches int
+  max_devices int
+  max_users int
+  monthly_price bigint [note: 'piasters']
+}
+
+Table platform_admins {
+  Note: 'writer: admin. Platform table'
+  uid varchar [pk, note: 'Firebase Auth uid']
+  role varchar [not null, note: 'super_admin | support | billing']
+  created_at timestamp [not null]
+}
+
+Table users {
+  Note: 'writer: function. Platform table, /users/{uid}'
+  uid varchar [pk, note: 'Firebase Auth uid (global, one person can work for several companies)']
+  display_name varchar
+  phone varchar
+  email varchar
+  default_company_id varchar [ref: > companies.id]
+  created_at timestamp [not null]
+}
+
+Table user_companies {
+  Note: 'writer: function. Mirror of members at /users/{uid}/companies/{company_id}, so "my companies" is one query'
+  uid varchar [ref: > users.uid]
+  company_id varchar [ref: > companies.id]
+  company_name varchar [not null, note: 'snapshot for the company switcher']
+  role_name varchar
+  status varchar [not null, note: 'active | disabled']
+  indexes {
+    (uid, company_id) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// CORE + SYNC & ADMIN (per tenant)
+//////////////////////////////////////////////////////////////
+
+TableGroup core {
+  companies
+  subscriptions
+  company_modules
+  branches
+  roles
+  members
+  devices
+  counters
+  audit_logs
+  sync_dead_letters
+  document_numbers
+  projection_failures
+}
+
+Table companies {
+  Note: 'writer: admin (create, status) + client owner (profile fields). /companies/{id}'
+  id varchar [pk, note: 'tenant id, short slug or ULID']
+  legal_name varchar [not null]
+  trade_name varchar
+  tax_registration_no varchar [note: 'RIN, used by ETA']
+  commercial_register_no varchar
+  address json [note: 'governorate, region_city, street, building_number (ETA issuer address)']
+  status varchar [not null, note: 'active | suspended | closed']
+  currency char(3) [not null, default: 'EGP']
+  timezone varchar [not null, default: 'Africa/Cairo', note: 'business day boundaries for reports']
+  database_id varchar [default: '(default)', note: 'named Firestore database for Enterprise tenants']
+  created_by varchar [note: 'platform admin uid']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  max_offline_hours int [not null, default: 24]
+}
+
+Table subscriptions {
+  Note: 'writer: admin/function. /companies/{cid}/subscription/current. Limits are enforced by Functions using counters'
+  company_id varchar [pk, ref: - companies.id]
+  plan_id varchar [not null, ref: > plans.id]
+  status varchar [not null, note: 'trial | active | past_due | cancelled']
+  period_start date
+  period_end date
+  extra_branches int [default: 0]
+  extra_devices int [default: 0]
+  extra_users int [default: 0]
+  updated_at timestamp [not null]
+}
+
+Table company_modules {
+  Note: 'writer: admin (via setCompanyModules function). /companies/{cid}/modules/{module_id}'
+  company_id varchar [ref: > companies.id]
+  module_id varchar [ref: > modules.id]
+  enabled boolean [not null, default: true]
+  enabled_at timestamp
+  expires_at timestamp [note: 'for trials / paid add-ons']
+  settings json [note: 'module-specific settings']
+  indexes {
+    (company_id, module_id) [pk]
+  }
+}
+
+Table branches {
+  Note: 'writer: client owner (via function, counts against plan limit)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  code varchar [not null, note: 'used in invoice numbers, unique per company (checked by the function)']
+  address json [note: 'ETA branch address']
+  eta_branch_id varchar [note: 'ETA issuer branch id']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table roles {
+  Note: 'writer: client owner (via function, bumps claims pv)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null, note: 'owner, manager, cashier, storekeeper, accountant or custom']
+  is_system boolean [not null, default: false]
+  permissions "varchar[]" [not null, note: 'module.action strings, e.g. pos.sell, pos.refund, inventory.adjust, reports.view_profit']
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table members {
+  Note: 'writer: function (inviteMember, setMemberRole). /companies/{cid}/members/{uid}'
+  company_id varchar [ref: > companies.id]
+  uid varchar [ref: > users.uid]
+  role_id varchar [not null, ref: > roles.id]
+  branch_ids "varchar[]" [note: 'empty = all branches']
+  pin_hash varchar [note: 'argon2/bcrypt hash for fast cashier switch on the POS (offline)']
+  status varchar [not null, note: 'invited | active | disabled']
+  invited_by varchar
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+  indexes {
+    (company_id, uid) [pk]
+  }
+}
+
+Table devices {
+  Note: 'writer: function (activateDevice, revokeDevice) + client device heartbeat fields. Rules check status == active on every device write'
+  id varchar [pk, note: 'POS terminal id; Firebase Auth uid is device_<id>']
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  label varchar
+  serial_no varchar [note: 'SUNMI serial, also the ETA POS serial']
+  invoice_prefix varchar [not null, note: 'unique per company, reserved through counters; never reused, even after reinstall']
+  status varchar [not null, note: 'pending | active | revoked. Revoke = disable auth user + revoke refresh tokens + rules deny']
+  last_seen_at timestamp
+  sync_cursors json [note: 'per collection: {products: [updated_at, doc_id], ...}, mirrored from the device for support']
+  app_version varchar
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revoked_at timestamp [note: 'sales with device_time after this are accepted but flagged']
+  last_acked_seq bigint [note: 'a gap between this and the next pushed seq raises an alert (lost or deleted outbox rows)']
+  last_chain_hash varchar [note: 'hash of the last accepted outbox row; each row carries prev_hash (tamper-evident chain)']
+  last_pull_at timestamp [note: 'device cannot open a new shift after companies.max_offline_hours without a pull']
+  projected_seq bigint [note: 'function: last seq applied by the in-order projector (devices/{id}/projection/state)']
+  pending_projection "bigint[]" [note: 'function: seqs received out of order, waiting for the missing one']
+  clock_offset_ms bigint [note: 'device clock minus server clock at last sync']
+}
+
+Table counters {
+  Note: 'writer: function. Usage counters (branches, devices, users) and sequences (eta, purchase no)'
+  company_id varchar [ref: > companies.id]
+  key varchar [note: 'e.g. branches_count, devices_count, users_count, invoice_prefix_seq, purchase_seq']
+  value bigint [not null]
+  indexes {
+    (company_id, key) [pk]
+  }
+}
+
+Table audit_logs {
+  Note: 'writer: function. Append-only'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  actor_uid varchar
+  device_id varchar [ref: > devices.id]
+  action varchar [not null, note: 'sale.void, price.change, role.update ...']
+  entity_type varchar
+  entity_id varchar
+  before json
+  after json
+  at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// PRODUCTS
+//////////////////////////////////////////////////////////////
+
+TableGroup products_module {
+  categories
+  units
+  products
+  product_units
+  product_barcodes
+  product_branch_prices
+}
+
+Table categories {
+  Note: 'writer: client'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  parent_id varchar [ref: > categories.id]
+  name varchar [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table units {
+  Note: 'writer: client. Base units only (pcs, kg, liter, meter)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  eta_unit_code varchar [note: 'ETA unit type code, e.g. EA, KGM']
+  decimals int [not null, default: 0, note: '0 = whole only, up to 3 (quantities are stored x1000)']
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table products {
+  Note: 'writer: client. Stock is NOT stored here; see stock_levels'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  category_id varchar [ref: > categories.id]
+  base_unit_id varchar [not null, ref: > units.id]
+  sku varchar
+  name varchar [not null]
+  name_ar varchar
+  cost_price bigint [not null, default: 0, note: 'piasters per base unit, moving average (function)']
+  selling_price bigint [not null, default: 0, note: 'piasters per base unit, company default']
+  vat_rate_bp int [not null, default: 1400, note: '1400 = 14%']
+  eta_tax_type varchar [note: 'e.g. T1']
+  eta_tax_subtype varchar [note: 'e.g. V009']
+  eta_item_type varchar [note: 'GS1 | EGS']
+  eta_item_code varchar
+  min_stock_milli bigint [default: 0]
+  track_stock boolean [not null, default: true]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table product_units {
+  Note: 'writer: client. Purchase / sale packs. Embedded array products.units[] (few per product)'
+  id varchar [pk]
+  product_id varchar [not null, ref: > products.id]
+  name varchar [not null, note: 'piece, carton, box of 6 ...']
+  factor_milli bigint [not null, note: 'base-unit quantity x1000 in one of this unit: carton of 12 pcs = 12000, 250 g pack = 250']
+  selling_price bigint [note: 'piasters for one of this unit; null = factor x base price']
+  is_default_sale boolean [default: false]
+  is_default_purchase boolean [default: false]
+}
+
+Table product_barcodes {
+  Note: 'writer: client. Document id = the barcode itself, so a barcode can only exist once per company'
+  barcode varchar [pk, note: 'document id']
+  company_id varchar [not null, ref: > companies.id]
+  product_id varchar [not null, ref: > products.id]
+  product_unit_id varchar [ref: > product_units.id, note: 'null = base unit']
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table product_branch_prices {
+  Note: 'writer: client (products.price_change permission). Doc id = {branch_id}_{product_id}_{unit_id}'
+  company_id varchar [ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  product_id varchar [ref: > products.id]
+  product_unit_id varchar [ref: > product_units.id, note: 'null = base unit']
+  selling_price bigint [not null, note: 'piasters, overrides the company price in this branch']
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+  indexes {
+    (company_id, branch_id, product_id, product_unit_id) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// INVENTORY
+//////////////////////////////////////////////////////////////
+
+TableGroup inventory_module {
+  stock_levels
+  stock_movements
+  stock_transfers
+  stock_transfer_items
+  stock_counts
+  stock_count_items
+  stock_alerts
+}
+
+Table stock_levels {
+  Note: 'writer: function only (the in-order projector, not the syncPush transaction). Doc id = {branch_id}_{product_id}'
+  company_id varchar [ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  product_id varchar [ref: > products.id]
+  quantity_milli bigint [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null]
+  last_seq_by_device json [note: '{deviceId: seq} already applied; lets the device rebase its unsynced sales']
+  indexes {
+    (company_id, branch_id, product_id) [pk]
+  }
+}
+
+Table stock_movements {
+  Note: 'writer: client (POS writes them with the sale, same batch) or function. Append-only. Doc id = {source_type}_{source_id}_{line_no}'
+  id varchar [pk, note: 'deterministic, see table note']
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  product_id varchar [not null, ref: > products.id]
+  quantity_milli bigint [not null, note: 'signed, base units x1000: + in, - out. No separate IN/OUT type']
+  unit_cost bigint [note: 'piasters per base unit']
+  source_type varchar [not null, note: 'SALE | SALE_RETURN | PURCHASE | TRANSFER_OUT | TRANSFER_IN | COUNT | OPENING']
+  source_id varchar [not null]
+  line_no int [not null]
+  device_id varchar [ref: > devices.id]
+  created_by varchar
+  created_at timestamp [not null]
+}
+
+Table stock_transfers {
+  Note: 'writer: client. Send creates TRANSFER_OUT movements in the source branch, receive creates TRANSFER_IN in the destination'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  from_branch_id varchar [not null, ref: > branches.id]
+  to_branch_id varchar [not null, ref: > branches.id]
+  status varchar [not null, note: 'draft | sent | received | cancelled (only before sent)']
+  sent_at timestamp
+  sent_by varchar
+  received_at timestamp
+  received_by varchar
+  note varchar
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table stock_transfer_items {
+  Note: 'writer: client. Embedded in stock_transfers (subcollection if > 300 lines)'
+  transfer_id varchar [ref: > stock_transfers.id]
+  line_no int
+  product_id varchar [not null, ref: > products.id]
+  quantity_milli bigint [not null, note: 'sent']
+  received_quantity_milli bigint [note: 'short receipt is recorded, not hidden']
+  indexes {
+    (transfer_id, line_no) [pk]
+  }
+}
+
+Table stock_counts {
+  Note: 'writer: client. Posting creates COUNT movements = counted - expected'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  scope varchar [note: 'full | category | selected']
+  status varchar [not null, note: 'open | posted | cancelled']
+  started_at timestamp [not null]
+  posted_at timestamp
+  posted_by varchar
+  reason varchar
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table stock_count_items {
+  Note: 'writer: client. Subcollection /stockCounts/{id}/items/{product_id}'
+  count_id varchar [ref: > stock_counts.id]
+  product_id varchar [ref: > products.id]
+  expected_quantity_milli bigint [not null, note: 'snapshot when the line is counted']
+  counted_quantity_milli bigint [not null]
+  counted_by varchar
+  counted_at timestamp
+  indexes {
+    (count_id, product_id) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// CUSTOMERS & SUPPLIERS
+//////////////////////////////////////////////////////////////
+
+TableGroup parties_module {
+  customers
+  suppliers
+}
+
+Table customers {
+  Note: 'writer: client (profile) + function (balance)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  phone varchar
+  buyer_type varchar [not null, default: 'P', note: 'P person | B business | F foreigner (ETA receiver type)']
+  tax_id varchar [note: 'required for B2B e-invoice']
+  national_id varchar
+  address json [note: 'country, governorate, region_city, street, building_number']
+  credit_limit bigint [default: 0]
+  balance bigint [not null, default: 0, note: 'piasters, function only, sum of account_entries']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table suppliers {
+  Note: 'writer: client (profile) + function (balance)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  phone varchar
+  tax_id varchar
+  address json
+  balance bigint [not null, default: 0, note: 'piasters, function only, sum of account_entries']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+//////////////////////////////////////////////////////////////
+// RECEIVING (goods receipts / purchases)
+//////////////////////////////////////////////////////////////
+
+TableGroup receiving_module {
+  purchases
+  purchase_items
+}
+
+Table purchases {
+  Note: 'writer: client. Editable only while draft; posted is immutable (posting creates PURCHASE movements and the supplier entry)'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  supplier_id varchar [ref: > suppliers.id]
+  supplier_invoice_no varchar
+  purchase_no varchar [note: 'internal sequence from counters']
+  date timestamp [not null]
+  status varchar [not null, note: 'draft | posted | voided']
+  void_of_purchase_id varchar [ref: > purchases.id, note: 'a void is a new reversing purchase document']
+  sub_total bigint [not null]
+  discount bigint [not null, default: 0]
+  tax bigint [not null, default: 0]
+  total bigint [not null]
+  payment_method varchar [note: 'cash | credit | mixed; paid part becomes a payment voucher']
+  device_id varchar [ref: > devices.id]
+  created_by varchar
+  posted_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table purchase_items {
+  Note: 'writer: client. Subcollection /purchases/{id}/items/{line_no} (a receipt can have hundreds of lines; 1 MiB doc limit)'
+  purchase_id varchar [ref: > purchases.id]
+  line_no int
+  product_id varchar [not null, ref: > products.id]
+  product_name varchar [not null, note: 'snapshot']
+  product_unit_id varchar [ref: > product_units.id]
+  unit_name varchar [not null, note: 'snapshot, e.g. carton']
+  unit_factor_milli bigint [not null, note: 'snapshot: base units x1000 per unit']
+  quantity_milli bigint [not null, note: 'in the purchase unit x1000; stock gets quantity x factor']
+  unit_cost bigint [not null, note: 'piasters per purchase unit']
+  discount bigint [not null, default: 0]
+  vat_rate_bp int [not null, default: 0]
+  tax bigint [not null, default: 0]
+  total bigint [not null]
+  indexes {
+    (purchase_id, line_no) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// POS
+//////////////////////////////////////////////////////////////
+
+TableGroup pos_module {
+  sales
+  sale_items
+  sale_payments
+  sale_returns
+  sale_return_items
+}
+
+Table sales {
+  Note: 'writer: client create only (through the syncPush function). Immutable: no updates, no status. Doc id = ULID. Void and returns are sale_returns documents'
+  id varchar [pk, note: 'ULID minted on the device at commit = idempotency key']
+  invoice_no varchar [not null, note: '{device prefix}-{yyyyMMdd}-{seq}; seq never resets. Printed number, unique via document_numbers']
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  device_id varchar [not null, ref: > devices.id]
+  shift_id varchar [not null, ref: > shifts.id]
+  customer_id varchar [ref: > customers.id]
+  buyer_snapshot json [note: 'type, name, tax_id, national_id, address at the time of sale (ETA receiver)']
+  device_time timestamp [not null, note: 'business time printed on the receipt; never replaced by server time']
+  sub_total bigint [not null]
+  discount bigint [not null, default: 0]
+  tax bigint [not null, default: 0]
+  total bigint [not null]
+  cashier_uid varchar [not null]
+  returned_total bigint [default: 0, note: 'function only, sum of sale_returns']
+  created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table sale_items {
+  Note: 'writer: client. Embedded array sales.items[] (a POS receipt stays far below 1 MiB)'
+  sale_id varchar [ref: > sales.id]
+  line_no int
+  product_id varchar [not null, ref: > products.id]
+  product_name varchar [not null, note: 'snapshot']
+  barcode varchar
+  product_unit_id varchar [ref: > product_units.id]
+  unit_name varchar [not null, note: 'snapshot']
+  unit_factor_milli bigint [not null, note: 'snapshot']
+  eta_unit_code varchar [note: 'snapshot']
+  eta_item_type varchar [note: 'snapshot GS1 | EGS']
+  eta_item_code varchar [note: 'snapshot']
+  eta_tax_type varchar [note: 'snapshot']
+  eta_tax_subtype varchar [note: 'snapshot']
+  vat_rate_bp int [not null, note: 'snapshot']
+  quantity_milli bigint [not null, note: 'in the sale unit x1000']
+  unit_price bigint [not null, note: 'piasters per sale unit']
+  cost_price bigint [not null, note: 'snapshot, piasters per sale unit, for profit']
+  discount bigint [not null, default: 0]
+  tax bigint [not null]
+  total bigint [not null]
+  indexes {
+    (sale_id, line_no) [pk]
+  }
+}
+
+Table sale_payments {
+  Note: 'writer: client. Embedded array sales.payments[]. method credit makes the function write account_entries/SALE_{sale_id}'
+  sale_id varchar [ref: > sales.id]
+  line_no int
+  method varchar [not null, note: 'cash | card | wallet | credit']
+  amount bigint [not null]
+  reference varchar
+  indexes {
+    (sale_id, line_no) [pk]
+  }
+}
+
+Table sale_returns {
+  Note: 'writer: client create only. Immutable. kind void = full reversal of the whole invoice; return = partial or full return of selected lines'
+  id varchar [pk, note: 'ULID minted on the device = idempotency key']
+  return_no varchar [not null, note: '{device prefix}-{yyyyMMdd}-R-{seq}, same never-reset counter, unique via document_numbers']
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  device_id varchar [not null, ref: > devices.id]
+  shift_id varchar [not null, ref: > shifts.id]
+  sale_id varchar [not null, ref: > sales.id]
+  kind varchar [not null, note: 'void | return']
+  device_time timestamp [not null, note: 'business time printed on the return receipt']
+  reason varchar
+  total bigint [not null]
+  refund_method varchar [not null, note: 'cash | card | wallet | credit (reduces customer balance)']
+  approved_by varchar [note: 'manager uid when the cashier lacks pos.refund']
+  created_by varchar [not null]
+  created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table sale_return_items {
+  Note: 'writer: client. Embedded array sale_returns.items[]. Function rejects returns above sold minus already returned'
+  return_id varchar [ref: > sale_returns.id]
+  line_no int
+  sale_line_no int [not null, note: 'points to sale_items(sale_id, line_no)']
+  product_id varchar [not null, ref: > products.id]
+  quantity_milli bigint [not null, note: 'in the original sale unit x1000']
+  unit_price bigint [not null, note: 'copied from the sale line']
+  tax bigint [not null]
+  total bigint [not null]
+  restock boolean [not null, default: true, note: 'false for damaged goods: no stock movement']
+  indexes {
+    (return_id, line_no) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// CASH DRAWER & SHIFTS
+//////////////////////////////////////////////////////////////
+
+TableGroup cash_shifts_module {
+  shifts
+  cash_movements
+}
+
+Table shifts {
+  Note: 'writer: client (open, close counted_cash) + function (expected_cash, difference). expected = opening + cash sales - cash refunds + cash receipt vouchers - cash payment vouchers - cash expenses + cash_in - cash_out'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  device_id varchar [not null, ref: > devices.id]
+  cashier_uid varchar [not null]
+  opened_at timestamp [not null]
+  closed_at timestamp
+  opening_cash bigint [not null]
+  expected_cash bigint [note: 'function, computed from the source documents, never from cash_movements alone']
+  counted_cash bigint
+  difference bigint [note: 'function']
+  status varchar [not null, note: 'open | closed']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+  sync_state varchar [not null, default: 'synced', note: 'synced | pending_sync (closed offline)']
+}
+
+Table cash_movements {
+  Note: 'writer: client. Append-only. ONLY manual drawer moves; sales, refunds, vouchers and expenses are read from their own tables'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  shift_id varchar [not null, ref: > shifts.id]
+  type varchar [not null, note: 'cash_in | cash_out (float top-up, safe drop, owner pickup)']
+  amount bigint [not null, note: 'positive piasters']
+  reason varchar [not null]
+  created_by varchar [not null]
+  created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+//////////////////////////////////////////////////////////////
+// CREDIT ACCOUNTS (vouchers + customer & supplier ledgers)
+//////////////////////////////////////////////////////////////
+
+TableGroup credit_module {
+  vouchers
+  account_entries
+}
+
+Table vouchers {
+  Note: 'writer: client create only. Immutable. Receipt (سند قبض) from a customer, payment (سند صرف) to a supplier. Void = new voucher with void_of_id'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  kind varchar [not null, note: 'receipt | payment']
+  customer_id varchar [ref: > customers.id, note: 'exactly one of customer_id / supplier_id']
+  supplier_id varchar [ref: > suppliers.id]
+  amount bigint [not null, note: 'positive piasters']
+  method varchar [not null, note: 'cash | card | wallet | bank']
+  shift_id varchar [ref: > shifts.id, note: 'set when the cash goes through the drawer']
+  void_of_id varchar [ref: > vouchers.id]
+  note varchar
+  device_id varchar [ref: > devices.id]
+  created_by varchar [not null]
+  created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+Table account_entries {
+  Note: 'writer: function only. Append-only. Doc id = {source_type}_{source_id}, so a source can post only once'
+  id varchar [pk, note: 'deterministic, see table note']
+  company_id varchar [not null, ref: > companies.id]
+  customer_id varchar [ref: > customers.id, note: 'exactly one of customer_id / supplier_id']
+  supplier_id varchar [ref: > suppliers.id]
+  debit bigint [not null, default: 0]
+  credit bigint [not null, default: 0]
+  source_type varchar [not null, note: 'SALE | SALE_RETURN | PURCHASE | VOUCHER | OPENING']
+  source_id varchar [not null]
+  created_at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// EXPENSES
+//////////////////////////////////////////////////////////////
+
+TableGroup expenses_module {
+  expense_categories
+  expenses
+}
+
+Table expense_categories {
+  Note: 'writer: client'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  name varchar [not null]
+  updated_at timestamp [not null]
+  revision bigint [not null, note: 'incremented by upsertMaster on every change']
+  deleted_at timestamp [note: 'tombstone; never hard-deleted']
+}
+
+Table expenses {
+  Note: 'writer: client create only. Immutable. Void = new expense with void_of_id and negative amount'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  category_id varchar [ref: > expense_categories.id]
+  shift_id varchar [ref: > shifts.id, note: 'when paid from the drawer']
+  amount bigint [not null]
+  date timestamp [not null]
+  note varchar
+  attachment_path varchar [note: 'Cloud Storage path']
+  void_of_id varchar [ref: > expenses.id]
+  created_by varchar [not null]
+  created_at timestamp [not null]
+  device_seq bigint [note: 'outbox sequence of the device that created it']
+  payload_hash varchar [not null, note: 'SHA-256 of canonical JSON (hash_v1); same id + other hash = dead letter']
+  server_received_at timestamp [note: 'server time, for lag and fraud review only']
+  flags "varchar[]" [note: 'server flags, never a rejection: oversold, device_revoked, clock_skew, price_below_cost']
+}
+
+//////////////////////////////////////////////////////////////
+// ETA E-INVOICE / E-RECEIPT
+//////////////////////////////////////////////////////////////
+
+TableGroup eta_module {
+  eta_settings
+  eta_documents
+}
+
+Table eta_settings {
+  Note: 'writer: client owner. /companies/{cid}/eta/settings'
+  company_id varchar [pk, ref: - companies.id]
+  environment varchar [note: 'preprod | prod']
+  taxpayer_rin varchar
+  activity_code varchar
+  client_secret_ref varchar [note: 'Secret Manager resource name ONLY, never the secret itself']
+  pos_serials json [note: 'registered POS serials for e-receipt']
+}
+
+Table eta_documents {
+  Note: 'writer: function only. Doc id = internal_id'
+  internal_id varchar [pk, note: 'invoice_no or return_no']
+  company_id varchar [not null, ref: > companies.id]
+  sale_id varchar [ref: > sales.id]
+  sale_return_id varchar [ref: > sale_returns.id]
+  doc_type varchar [not null, note: 'receipt | return_receipt | invoice | credit_note']
+  original_eta_uuid varchar [note: 'UUID of the original document, required for return receipts / credit notes']
+  eta_uuid varchar
+  eta_long_id varchar
+  submission_id varchar
+  signed_payload_path varchar [note: 'Cloud Storage path of the exact signed JSON that was sent']
+  status varchar [not null, note: 'queued | submitted | valid | invalid | cancelled']
+  errors json
+  attempts int [not null, default: 0]
+  submitted_at timestamp
+  updated_at timestamp [not null]
+}
+
+//////////////////////////////////////////////////////////////
+// REPORTS (derived, written only by Cloud Functions)
+//////////////////////////////////////////////////////////////
+
+TableGroup reports_module {
+  daily_summaries
+}
+
+Table daily_summaries {
+  Note: 'writer: function only. Doc id = {branch_id}_{yyyyMMdd}'
+  company_id varchar [ref: > companies.id]
+  branch_id varchar [ref: > branches.id]
+  day date [note: 'business day in companies.timezone (Africa/Cairo), not UTC']
+  sales_count int
+  sales_total bigint
+  returns_total bigint
+  cost_total bigint
+  gross_profit bigint
+  expenses_total bigint
+  by_payment json
+  updated_at timestamp [not null]
+  indexes {
+    (company_id, branch_id, day) [pk]
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// SYNC SUPPORT (see docs/database/sync-strategy.md)
+//////////////////////////////////////////////////////////////
+
+Table sync_dead_letters {
+  Note: 'writer: function only. A document that arrived with an existing id but a different payload_hash. History is never overwritten; support resolves it'
+  id varchar [pk, note: '{device_id}_{device_seq}']
+  company_id varchar [not null, ref: > companies.id]
+  device_id varchar [not null, ref: > devices.id]
+  device_seq bigint [not null]
+  collection varchar [not null]
+  doc_id varchar [not null]
+  stored_hash varchar [not null]
+  incoming_hash varchar [not null]
+  incoming_body json [not null]
+  status varchar [not null, note: 'open | resolved']
+  received_at timestamp [not null]
+}
+
+Table stock_alerts {
+  Note: 'writer: function only. Raised instead of rejecting a sale: negative stock, oversell, short transfer receipt'
+  id varchar [pk]
+  company_id varchar [not null, ref: > companies.id]
+  branch_id varchar [not null, ref: > branches.id]
+  product_id varchar [not null, ref: > products.id]
+  kind varchar [not null, note: 'negative_stock | short_receipt | count_difference']
+  quantity_milli bigint [not null, note: 'balance after the movement, or the difference']
+  source_type varchar
+  source_id varchar
+  status varchar [not null, note: 'open | acknowledged']
+  acknowledged_by varchar
+  created_at timestamp [not null]
+}
+
+Table document_numbers {
+  Note: 'writer: function only. Uniqueness guard for printed numbers, claimed in the same transaction that creates the document. A second claim by another document is flagged duplicate_number, never rejected (the receipt is already printed)'
+  number varchar [pk, note: 'document id, e.g. invoice_no or return_no']
+  company_id varchar [not null, ref: > companies.id]
+  doc_type varchar [not null, note: 'sale | sale_return']
+  doc_id varchar [not null, note: 'ULID of the document that claimed it first']
+  device_id varchar [not null, ref: > devices.id]
+  claimed_at timestamp [not null]
+}
+
+Table projection_failures {
+  Note: 'writer: function only. A document the projector could not apply because of a permanent error. Never dropped; the sweeper re-applies it after the fix'
+  id varchar [pk, note: '{collection}_{doc_id}']
+  company_id varchar [not null, ref: > companies.id]
+  device_id varchar [ref: > devices.id]
+  device_seq bigint
+  collection varchar [not null]
+  doc_id varchar [not null]
+  error varchar [not null]
+  attempts int [not null, default: 1]
+  status varchar [not null, note: 'open | resolved']
+  first_failed_at timestamp [not null]
+  resolved_at timestamp
+}
