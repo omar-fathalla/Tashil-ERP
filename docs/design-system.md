@@ -130,12 +130,51 @@ playground tab "الأساسيات", sections "نظام الألوان: المص
   the source.
 
 ### Typography
-- Font: **Cairo** (SIL OFL), bundled in `assets/fonts/cairo`. Never fetched
-  at runtime, because the device is often offline.
-- Use `Theme.of(context).textTheme.*` only. No hand-written `fontSize` in
-  screens. The one exception is `ReceiptPreview`, which is sized for the
-  printer, not the screen.
-- Digits are **Western (0-9)** everywhere, including sample data.
+Sources: **m3.material.io/styles/typography** (overview, fonts, type
+scale & tokens, applying type, editorial treatments). Code:
+`lib/core/design/typography.dart` (`TashilType`, `TashilTypeScale`,
+`TashilLanguageHeight`, `TashilEditorial`, `LinkText`), wired in
+`app_theme.dart`. Live: playground tab "الأساسيات", section "الخطوط".
+
+- **Font: Cairo** (SIL OFL), a variable font (weight 200 to 1000, slant)
+  bundled in `assets/fonts/cairo`. Never fetched at runtime, because the
+  device is often offline. The `wght` axis is pinned to every style's
+  weight. Fallback after Cairo: Roboto, then Noto Sans (M3 order).
+- **Brand and plain typefaces:** display and headline use
+  `TashilType.brandFont`, everything else `TashilType.plainFont`. Both
+  are Cairo today; change the token, not screens, to try another.
+- **Type scale:** 5 roles (display, headline, title, body, label) x 3
+  sizes, M3 sizes on the Major Second scale with 14 as body base.
+  Use `Theme.of(context).textTheme.*` only; no hand-written `fontSize`
+  in screens (`ReceiptPreview` is the one exception: it is sized for the
+  printer).
+  - Display: short, important text or numbers, mostly on large screens.
+  - Headline: short high-emphasis text on small screens, dialogs.
+  - Title: medium emphasis, app bars, section headers.
+  - Body: longer text. Never a decorative font.
+  - Label: text inside components (buttons use label large), captions.
+- **Emphasized styles** (M3 Expressive): `TashilType.emphasized(context)`
+  has 15 styles with the same size and line height, one weight step
+  heavier (tokens from androidx Compose). Use them for selected items,
+  unread items, primary actions and badges. Components keep baseline by
+  default.
+- **Language height:** Arabic is M3's "medium" category, so every line
+  height is 7% taller than the Latin tokens (display large 57/68). Leave
+  room in fixed-height components.
+- **Numbers:** Cairo's digits are tabular (all the same width), so
+  prices in columns and changing values (clocks, totals) don't shift.
+  Western digits (0-9) everywhere, including sample data. Right-align
+  numbers in columns.
+- **Contrast:** text on surface uses onSurface (onSurfaceVariant for
+  lower emphasis): 4.5:1 for small text, 3:1 for large.
+- **Links:** `LinkText`: primary (tertiary for a quieter link), always
+  underlined, announced as a link.
+- **Editorial treatments:** only for standalone hero moments (end-of-day
+  sales, a goal reached), never for labels or plain information, one
+  treatment per layout, from the tokens in `TashilType.editorial`
+  (`heroNumber`, `heroCaption`; `heroNumberAt` moves the weight axis
+  with a value). Cairo has no grade, width or optical-size axes, so those
+  M3 treatments are not used; avoid very light weights at small sizes.
 
 ### Money and numbers
 - Money is stored as integer piastres. Show it with `MoneyText` or

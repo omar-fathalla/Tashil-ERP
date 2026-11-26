@@ -6,6 +6,7 @@ import '../../../core/design/widgets/color_scheme_picker.dart';
 import 'color_roles_demo.dart';
 import 'common.dart';
 import 'content_color_demo.dart';
+import 'typography_demo.dart';
 
 class FoundationsSection extends StatelessWidget {
   const FoundationsSection({super.key});
@@ -14,21 +15,6 @@ class FoundationsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-
-    final styles = <(String, TextStyle?)>[
-      ('displaySmall', text.displaySmall),
-      ('headlineMedium', text.headlineMedium),
-      ('headlineSmall', text.headlineSmall),
-      ('titleLarge', text.titleLarge),
-      ('titleMedium', text.titleMedium),
-      ('titleSmall', text.titleSmall),
-      ('bodyLarge', text.bodyLarge),
-      ('bodyMedium', text.bodyMedium),
-      ('bodySmall', text.bodySmall),
-      ('labelLarge', text.labelLarge),
-      ('labelMedium', text.labelMedium),
-      ('labelSmall', text.labelSmall),
-    ];
 
     return SectionList([
       const SpecSection(
@@ -63,29 +49,18 @@ class FoundationsSection extends StatelessWidget {
             'والباقي زي ما هو. اختار منتج تاني تشوف الكارت بيتلوّن.',
         children: [ContentColorDemo()],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'الخطوط',
-        spec: 'styles/typography/type-scale-tokens',
+        m3: 'Typography · type scale & tokens',
+        spec: 'styles/typography/applying-type',
         rule:
-            'خط Cairo مضمّن في التطبيق (يشتغل أوفلاين). '
-            'استخدم textTheme فقط، ممنوع fontSize يدوي.',
-        children: [
-          for (final (name, style) in styles)
-            Padding(
-              padding: const EdgeInsets.only(bottom: TashilSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: text.labelSmall?.copyWith(color: s.primary),
-                    textDirection: TextDirection.ltr,
-                  ),
-                  Text('سكر أبيض 1 كجم — 45.50 ج.م', style: style),
-                ],
-              ),
-            ),
-        ],
+            'خط Cairo مضمّن (أوفلاين)، ومعاه بدائل Roboto ثم Noto Sans. 5 '
+            'أدوار × 3 مقاسات: 15 Baseline و15 Emphasized. الـ Emphasized '
+            'للمختار وغير المقروء والإجراء الأهم. العربي "ارتفاع متوسط" فالسطر '
+            'أطول 7%. استخدم textTheme بس، ممنوع fontSize يدوي. الأرقام بنفس '
+            'العرض. الروابط primary وتحتها خط. المعالجة التحريرية للحظات '
+            'المميزة بس.',
+        children: [TypographyDemo()],
       ),
       SpecSection(
         title: 'الأشكال',

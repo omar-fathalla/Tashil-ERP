@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'motion.dart';
 import 'tokens.dart';
+import 'typography.dart';
 import 'widgets/tooltips.dart';
 
 /// Builds the single Material 3 theme used by the app and the playground.
@@ -52,16 +53,31 @@ abstract final class TashilTheme {
       visualDensity: VisualDensity.standard,
       materialTapTargetSize: MaterialTapTargetSize.padded,
     );
-    final text = _withWeightAxis(base.textTheme);
+    // M3 type scale with Arabic's "medium" language height; emphasized
+    // styles and editorial tokens go in the theme extension.
+    const languageHeight = TashilLanguageHeight.medium;
+    final text = TashilTypeScale.baseline(base.textTheme, languageHeight);
+    final emphasized = TashilTypeScale.emphasized(
+      base.textTheme,
+      languageHeight,
+    );
 
     const buttonMin = Size(64, TashilSizes.minTouch);
     final buttonText = WidgetStatePropertyAll(text.labelLarge);
 
     return base.copyWith(
       textTheme: text,
-      primaryTextTheme: _withWeightAxis(base.primaryTextTheme),
+      primaryTextTheme: TashilTypeScale.baseline(
+        base.primaryTextTheme,
+        languageHeight,
+      ),
       extensions: [
         TashilSemanticColors.forBrightness(brightness, contrast: contrast),
+        TashilTypeExtension(
+          emphasized: emphasized,
+          editorial: TashilEditorial.from(text, emphasized),
+          languageHeight: languageHeight,
+        ),
       ],
       appBarTheme: const AppBarTheme(centerTitle: false),
       filledButtonTheme: FilledButtonThemeData(
@@ -118,34 +134,6 @@ abstract final class TashilTheme {
         rangePickerHeaderHeadlineStyle: text.headlineSmall,
       ),
       pageTransitionsTheme: TashilTransitions.pageTransitionsTheme,
-    );
-  }
-
-  /// Cairo ships as a variable font. Pin the `wght` axis to each style's
-  /// [FontWeight] so bold text is really bold on every renderer.
-  static TextTheme _withWeightAxis(TextTheme t) {
-    TextStyle? fix(TextStyle? s) {
-      if (s == null) return null;
-      final w = (s.fontWeight ?? FontWeight.w400).value.toDouble();
-      return s.copyWith(fontVariations: [FontVariation.weight(w)]);
-    }
-
-    return t.copyWith(
-      displayLarge: fix(t.displayLarge),
-      displayMedium: fix(t.displayMedium),
-      displaySmall: fix(t.displaySmall),
-      headlineLarge: fix(t.headlineLarge),
-      headlineMedium: fix(t.headlineMedium),
-      headlineSmall: fix(t.headlineSmall),
-      titleLarge: fix(t.titleLarge),
-      titleMedium: fix(t.titleMedium),
-      titleSmall: fix(t.titleSmall),
-      bodyLarge: fix(t.bodyLarge),
-      bodyMedium: fix(t.bodyMedium),
-      bodySmall: fix(t.bodySmall),
-      labelLarge: fix(t.labelLarge),
-      labelMedium: fix(t.labelMedium),
-      labelSmall: fix(t.labelSmall),
     );
   }
 }
