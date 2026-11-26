@@ -54,9 +54,9 @@ contrast button in the app bar cycles the three levels).
   their tonal palettes (tone 0 black to 100 white, in HCT) and the 26+
   roles, for light and dark. Never hand-pick tones; never write a hex
   colour in a screen. HCT tones are not HSL lightness.
-- **Static, not dynamic:** no wallpaper or content-based colour. A shared
-  shop device must look the same for every cashier, and the brand
-  colour stays on screen and in the admin panel.
+- **Scheme source** (see "Colour schemes" below): static Tashil green by
+  default; the store colour, the device wallpaper and the M3 baseline
+  are choices in appearance settings.
 - **Roles are "paint by number":** use a fill only with its own "on"
   colour (primary with onPrimary, primaryContainer with
   onPrimaryContainer). Mixing pairs breaks contrast, above all at other
@@ -92,6 +92,42 @@ contrast button in the app bar cycles the three levels).
   color_test.dart` checks every pair at every level.
 - Stock: green = available, orange = at or below minimum, red (`error`)
   = out.
+
+### Colour schemes
+Sources: **m3.material.io/styles/color/choosing-a-scheme**, **/static/
+baseline**, **/static/custom-brand**, **/dynamic/choosing-a-source**,
+**/dynamic/user-generated-source**, **/dynamic/content-based-source**.
+Code: `lib/core/design/color_schemes.dart` (`TashilColorSource`,
+`TashilColorSettings`, `TashilColorController`, `TashilColorScope`,
+`ContentColorScope`) and `widgets/color_scheme_picker.dart`. Live:
+playground tab "الأساسيات", sections "نظام الألوان: المصدر" and "ألوان
+من المحتوى".
+
+- A scheme is all colours, roles and relationships for light and dark.
+  The **roles never change** between schemes; only their colours do, so
+  screens always use roles and work with every source.
+- **Static, Tashil (default):** from `TashilColors.seed`. Same on every
+  device, which suits enterprise and shared shop devices (M3: static for
+  enterprise products).
+- **Static, store colour** (M3 "custom brand"): the owner picks the
+  store's brand colour once; every device of that store matches. It will
+  be saved on the company (`companies/{id}`) with the settings screen.
+- **Dynamic, user-generated:** from the device wallpaper through Google's
+  `dynamic_color` package (Android 12+). Where the system has no
+  wallpaper colour (older Android, web) Tashil green is used instead.
+- **Static, M3 baseline:** the purple Material default, for comparing
+  with M3 references.
+- **Fidelity:** optional `DynamicSchemeVariant.fidelity`, which keeps the
+  scheme closer to the source colour (strong brand colours). Default is
+  tonal spot.
+- **Contrast** (standard, medium, high) applies to every source.
+- **Content-based:** `ContentColorScope(image: ...)` recolours one
+  contained area from an image in it (a product card from its photo),
+  with the content algorithm. Never the whole app, and only next to the
+  image.
+- Put `TashilColorScope` above `MaterialApp`; `ColorSchemePicker` is the
+  ready-made settings UI. Error and success/warning stay static whatever
+  the source.
 
 ### Typography
 - Font: **Cairo** (SIL OFL), bundled in `assets/fonts/cairo`. Never fetched

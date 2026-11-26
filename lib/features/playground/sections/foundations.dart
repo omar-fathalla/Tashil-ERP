@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
+import '../../../core/design/widgets/color_scheme_picker.dart';
 import 'color_roles_demo.dart';
 import 'common.dart';
+import 'content_color_demo.dart';
 
 class FoundationsSection extends StatelessWidget {
   const FoundationsSection({super.key});
@@ -40,6 +42,26 @@ class FoundationsSection extends StatelessWidget {
             'تباين (زرار التباين فوق): عادي، متوسط، عالي، والعالي بيشتغل '
             'لوحده لو الجهاز طالبه. الرقم جنب كل لون هو التباين.',
         children: [ColorRolesDemo()],
+      ),
+      const SpecSection(
+        title: 'نظام الألوان: المصدر',
+        m3: 'Color schemes · static and dynamic',
+        spec: 'styles/color/choosing-a-scheme',
+        rule:
+            'ثابت (الافتراضي): ألوان تسهيل أو لون المحل، نفس الشكل على كل '
+            'جهاز. ديناميك: من خلفية الجهاز (أندرويد 12+). ألوان M3 '
+            'الأساسية للمقارنة. التغيير بيلوّن البلاي جراوند كله. الأدوار '
+            'نفسها في كل الحالات، اللي بيتغير الألوان بس.',
+        children: [ColorSchemePicker()],
+      ),
+      const SpecSection(
+        title: 'ألوان من المحتوى',
+        m3: 'Content-based color',
+        spec: 'styles/color/dynamic/content-based-source',
+        rule:
+            'جزء محدد من الشاشة (كارت المنتج) بياخد ألوانه من صورته، '
+            'والباقي زي ما هو. اختار منتج تاني تشوف الكارت بيتلوّن.',
+        children: [ContentColorDemo()],
       ),
       SpecSection(
         title: 'الخطوط',

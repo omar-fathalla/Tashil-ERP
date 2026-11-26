@@ -17,19 +17,33 @@ abstract final class TashilTheme {
   /// [contrast] follows the M3 contrast levels; the app passes
   /// [TashilContrast.high] for `highContrastTheme` (system setting) and
   /// may offer medium and high as an in-app choice.
-  static ThemeData light({TashilContrast contrast = TashilContrast.standard}) =>
-      _build(Brightness.light, contrast);
-  static ThemeData dark({TashilContrast contrast = TashilContrast.standard}) =>
-      _build(Brightness.dark, contrast);
+  ///
+  /// [seed] is the scheme's source colour (Tashil green by default; see
+  /// `color_schemes.dart` for the store colour, wallpaper and baseline
+  /// sources). [variant] is the Material Color Utilities algorithm:
+  /// tonal spot by default, fidelity to stay close to a brand colour.
+  static ThemeData light({
+    TashilContrast contrast = TashilContrast.standard,
+    Color seed = TashilColors.seed,
+    DynamicSchemeVariant variant = DynamicSchemeVariant.tonalSpot,
+  }) => _build(Brightness.light, contrast, seed, variant);
+  static ThemeData dark({
+    TashilContrast contrast = TashilContrast.standard,
+    Color seed = TashilColors.seed,
+    DynamicSchemeVariant variant = DynamicSchemeVariant.tonalSpot,
+  }) => _build(Brightness.dark, contrast, seed, variant);
 
-  static ThemeData _build(Brightness brightness, TashilContrast contrast) {
-    // Static scheme from the brand seed with the default tonal-spot
-    // algorithm (M3 "hand-picked source colour"). No wallpaper colour: a
-    // shared shop device should look the same for every cashier.
+  static ThemeData _build(
+    Brightness brightness,
+    TashilContrast contrast,
+    Color seed,
+    DynamicSchemeVariant variant,
+  ) {
     final scheme = ColorScheme.fromSeed(
-      seedColor: TashilColors.seed,
+      seedColor: seed,
       brightness: brightness,
       contrastLevel: contrast.level,
+      dynamicSchemeVariant: variant,
     );
     final base = ThemeData(
       colorScheme: scheme,
