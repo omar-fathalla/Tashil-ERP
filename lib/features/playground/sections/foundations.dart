@@ -7,6 +7,7 @@ import 'color_roles_demo.dart';
 import 'common.dart';
 import 'content_color_demo.dart';
 import 'typography_demo.dart';
+import 'density_rtl_demo.dart';
 import 'layout_demo.dart';
 
 class FoundationsSection extends StatelessWidget {
@@ -101,10 +102,32 @@ class FoundationsSection extends StatelessWidget {
             'المقبض بين الجزأين بيغيّر العرض، ولو سحبته للآخر بيقفل جزء.',
         children: [LayoutDemo()],
       ),
+      const SpecSection(
+        title: 'الكثافة',
+        spec: 'foundations/layout/grids-spacing/density',
+        rule:
+            'اختيارية: صاحب المحل يختارها من الإعدادات، ومش بتتغير لوحدها مع '
+            'حجم الشاشة. كل درجة بتشيل 4dp من فوق وتحت. للقوايم والجداول '
+            'والفورمات الطويلة بس، مش للقوايم المنسدلة والحوارات والتنبيهات. '
+            'الأزرار ومساحة اللمس 48 زي ما هي، وحجم الخط مش بيتغير.',
+        children: [DensityDemo()],
+      ),
+      const SpecSection(
+        title: 'من اليمين للشمال',
+        spec: 'foundations/layout/bidirectionality-rtl',
+        rule:
+            'الأسهم وزرار الإرسال والخروج والشارة والتقدم الخطي والسحب بتتعكس. '
+            'الساعة والتحديث والدوائر وأزرار الميديا بتفضل زي ما هي. الموبايل '
+            'والإيميل والباركود بيتكتبوا من الشمال لليمين جوه الكلام العربي.',
+        children: [RtlDemo()],
+      ),
       SpecSection(
         title: 'المسافات',
         spec: 'foundations/layout/understanding-layout/spacing',
-        rule: 'شبكة 4dp. هامش الصفحة 16 في المضغوط و24 من المتوسط. أقل مساحة لمس 48.',
+        rule:
+            'الوحدة الأساسية 8dp وبنستخدم أنصافها (4). الـ padding جوه العنصر، '
+            'والـ gap بين العناصر، ونحطهم على الأب بدل margin على الأولاد. '
+            'هامش الصفحة 16 في المضغوط و24 من المتوسط. أقل مساحة لمس 48.',
         children: [
           for (final (n, v) in const [
             ('xs', TashilSpacing.xs),

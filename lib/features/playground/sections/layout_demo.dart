@@ -27,6 +27,7 @@ class _LayoutDemoState extends State<LayoutDemo> {
   TashilBreakpoint _b = TashilBreakpoint.expanded;
   int? _open = 0;
   bool _contained = false;
+  bool _grid = false;
   PaneSplit _split = PaneSplit.fixedFlexible;
 
   /// Persistent resizing: the width you drag to stays when you switch
@@ -109,6 +110,14 @@ class _LayoutDemoState extends State<LayoutDemo> {
           value: _contained,
           onChanged: (v) => setState(() => _contained = v),
         ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'إظهار الأعمدة (${b.columns} عمود، بينهم ${b.gutter.round()})',
+          ),
+          value: _grid,
+          onChanged: (v) => setState(() => _grid = v),
+        ),
         DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(color: scheme.outlineVariant),
@@ -159,6 +168,10 @@ class _LayoutDemoState extends State<LayoutDemo> {
                             third: const _Filters(),
                           ),
                         ),
+                        if (_grid)
+                          Positioned.fill(
+                            child: ColumnGridOverlay(breakpoint: b),
+                          ),
                         if (compact)
                           const Positioned(
                             left: 0,

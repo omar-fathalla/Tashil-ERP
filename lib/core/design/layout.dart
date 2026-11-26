@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -80,6 +82,33 @@ enum TashilBreakpoint {
     large || extraLarge => 412,
   };
 
+  /// Full-screen dialogs only on compact; from medium a basic dialog does
+  /// the same job (M3 breakpoints > common swappable components).
+  bool get allowsFullScreenDialog => this == compact;
+
+  /// Supplemental selection (sort, pick an option) is a bottom sheet on
+  /// compact and a menu from medium.
+  SupplementalSelection get supplementalSelection => this == compact
+      ? SupplementalSelection.bottomSheet
+      : SupplementalSelection.menu;
+
+  /// Whether a two-pane layout here should pair with a navigation bar
+  /// instead of a rail: on medium the two panes need the full width.
+  bool navigationBarWithTwoPanes(int panes) => this == medium && panes == 2;
+
+  /// Layout grid columns (m3.material.io/foundations/layout/grids-spacing):
+  /// 4 on compact (phone), 8 on medium and expanded (foldable, tablet).
+  /// 12 from large is our choice for desktop; M3 only shows 4 and 8.
+  int get columns => switch (this) {
+    compact => 4,
+    medium || expanded => 8,
+    large || extraLarge => 12,
+  };
+
+  /// Space between grid columns: same as the margin (16 compact, 24 from
+  /// medium), so the edges and the gutters share one rhythm.
+  double get gutter => margin;
+
   /// Arabic name for the playground and debug labels.
   String get label => switch (this) {
     compact => 'مضغوط',
@@ -88,6 +117,33 @@ enum TashilBreakpoint {
     large => 'كبير',
     extraLarge => 'كبير جداً',
   };
+}
+
+/// The component for a supplemental selection at a breakpoint.
+enum SupplementalSelection { bottomSheet, menu }
+
+/// Height breakpoints (Android window size classes for height): compact
+/// under 480dp, medium 480 to 899dp, expanded from 900dp. Most layouts
+/// scroll vertically and never need them; use them only when vertical
+/// space is unusually small, such as a phone in landscape with the
+/// keyboard open at the counter.
+enum TashilHeightBreakpoint {
+  compact(0),
+  medium(480),
+  expanded(900);
+
+  const TashilHeightBreakpoint(this.minHeight);
+
+  final double minHeight;
+
+  static TashilHeightBreakpoint fromHeight(double height) => height >= 900
+      ? expanded
+      : height >= 480
+      ? medium
+      : compact;
+
+  static TashilHeightBreakpoint of(BuildContext context) =>
+      fromHeight(MediaQuery.sizeOf(context).height);
 }
 
 /// How a two-pane layout shares the width (M3 scaffold > panes). Every
@@ -653,6 +709,162 @@ class AdaptiveFab extends StatelessWidget {
       onPressed: onPressed,
       tooltip: label,
       child: Icon(icon),
+    );
+  }
+}
+
+/// Column grid of one pane or window (M3 grids and spacing). The grid is
+/// for aligning content, not a cage: bars and rails sit outside it (they
+/// are placed first, nearest the screen edges), panes and their content
+/// line up on its columns.
+@immutable
+class ColumnGrid {
+  const ColumnGrid({
+    required this.width,
+    required this.columns,
+    required this.gutter,
+    required this.margin,
+  }) : assert(columns > 0);
+
+  /// The grid of [breakpoint] across a [width] that still includes margins.
+  factory ColumnGrid.of(double width, TashilBreakpoint breakpoint) =>
+      ColumnGrid(
+        width: width,
+        columns: breakpoint.columns,
+        gutter: breakpoint.gutter,
+        margin: breakpoint.margin,
+      );
+
+  final double width;
+  final int columns;
+  final double gutter;
+  final double margin;
+
+  /// Width of one column.
+  double get column =>
+      math.max(0, (width - 2 * margin - (columns - 1) * gutter) / columns);
+
+  /// Width of [n] columns with the gutters between them. Use it to size
+  /// cards and fields so their edges fall on the grid.
+  double span(int n) {
+    final c = n.clamp(1, columns);
+    return c * column + (c - 1) * gutter;
+  }
+
+  /// Distance from the leading edge to the start of column [i] (0-based):
+  /// the "content ruler" that titles and leading icons line up on.
+  double start(int i) => margin + i.clamp(0, columns - 1) * (column + gutter);
+}
+
+/// Debug overlay that tints the columns of the grid, for the playground
+/// and for checking alignment. Ignores pointers.
+class ColumnGridOverlay extends StatelessWidget {
+  const ColumnGridOverlay({super.key, this.breakpoint});
+
+  final TashilBreakpoint? breakpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.error.withValues(alpha: 0.08);
+    return IgnorePointer(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final b = breakpoint ?? TashilBreakpoint.fromWidth(c.maxWidth);
+          final grid = ColumnGrid.of(c.maxWidth, b);
+          return Padding(
+            padding: EdgeInsets.symmetric(horizontal: grid.margin),
+            child: Row(
+              spacing: grid.gutter,
+              children: [
+                for (var i = 0; i < grid.columns; i++)
+                  Expanded(child: ColoredBox(color: color)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// M3 density scale (m3.material.io/foundations/layout/grids-spacing/density).
+/// Each step down removes 4dp of top and bottom padding (or height). Text
+/// size never changes.
+///
+/// * Opt-in only: the person picks it in settings. Never switch density
+///   because of breakpoint or orientation.
+/// * Only for information-dense screens: lists, tables, long forms
+///   (inventory, reports). Not for focused tasks or alerts: menus,
+///   dialogs, snackbars keep the default.
+/// * Touch targets stay 48dp even when the visual gets smaller.
+enum TashilDensity {
+  standard(0),
+  comfortable(-1),
+  compact(-2),
+  dense(-3);
+
+  const TashilDensity(this.step);
+
+  /// 0, -1, -2 or -3; each step is 4dp.
+  final int step;
+
+  /// Flutter's density uses the same 4dp steps, vertical only.
+  VisualDensity get visualDensity =>
+      VisualDensity(horizontal: 0, vertical: step.toDouble());
+
+  String get label => switch (this) {
+    standard => 'عادي',
+    comfortable => '-1',
+    compact => '-2',
+    dense => '-3',
+  };
+}
+
+/// Applies a [TashilDensity] to a dense part of a screen (a list, a table,
+/// a long form): list rows, text fields and data table rows get shorter.
+///
+/// Buttons, checkboxes, switches and icon buttons keep standard density:
+/// Flutter shrinks their touch target with density, and M3 keeps targets
+/// at 48dp. List and table rows never go below 48dp either.
+///
+/// Dialogs, menus and sheets opened from inside capture this theme, so
+/// open them from outside the scope or wrap their content in
+/// `DensityScope(density: TashilDensity.standard)`: M3 never densifies
+/// focused tasks and alerts.
+class DensityScope extends StatelessWidget {
+  const DensityScope({super.key, required this.density, required this.child});
+
+  final TashilDensity density;
+  final Widget child;
+
+  /// M3 data table row (52dp) and header (56dp) heights at [density].
+  static double dataRowHeight(TashilDensity density) =>
+      math.max(TashilSizes.minTouch, 52.0 + 4 * density.step);
+  static double headingRowHeight(TashilDensity density) =>
+      math.max(TashilSizes.minTouch, 56.0 + 4 * density.step);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final v = density.visualDensity;
+    return Theme(
+      data: theme.copyWith(
+        // One-line rows are 56dp: -2 already reaches 48, so stop there.
+        listTileTheme: theme.listTileTheme.copyWith(
+          visualDensity: VisualDensity(
+            vertical: math.max(-2, density.step).toDouble(),
+          ),
+        ),
+        inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+          visualDensity: v,
+        ),
+        dataTableTheme: theme.dataTableTheme.copyWith(
+          dataRowMinHeight: dataRowHeight(density),
+          dataRowMaxHeight: dataRowHeight(density),
+          headingRowHeight: headingRowHeight(density),
+        ),
+      ),
+      child: child,
     );
   }
 }

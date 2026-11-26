@@ -279,6 +279,70 @@ design, and the breakpoint pages for the numbers). Code:
   quarter, none hugging the bottom edge.
 - **Input**: every layout works with touch, pointer and a physical
   keyboard, whatever the device (a tablet with a keyboard is a desktop).
+- **Per breakpoint** (m3.material.io/foundations/layout/breakpoints/*):
+
+  | | Compact | Medium | Expanded | Large / XL |
+  | --- | --- | --- | --- | --- |
+  | Panes | 1 | 1 (2 for low density) | 2 (1 for dense media) | 2 (XL up to 3) |
+  | Navigation | bar, modal expanded rail | rail; **bar when two panes** | collapsed or expanded rail | rail; expanded best on XL |
+  | Communication | basic or full-screen dialog | basic dialog | basic dialog | basic dialog |
+  | Supplemental selection | bottom sheet | menu | menu | menu |
+
+  In code: `allowsFullScreenDialog`, `supplementalSelection`,
+  `navigationBarWithTwoPanes(panes)` on `TashilBreakpoint`. Medium two
+  panes are 50/50 with no custom widths (the handle can open one to
+  100%). From expanded, sorting, filtering and secondary navigation are
+  tabs or controls inside the pane, not in the navigation. The rail can
+  hide on secondary destinations if back still reaches the primary one;
+  collapse it on deep pages or when space is needed.
+- **Height breakpoints** (`TashilHeightBreakpoint`): compact < 480,
+  medium 480–899, expanded 900+ (Android values; M3 gives no numbers).
+  Only for unusually short windows, such as landscape with the keyboard.
+- **Transitions**: every layout changes live when a foldable opens or
+  folds, the device rotates, split screen or multi-window starts or ends,
+  or a free-form window is resized. Keep state (open item, scroll, form
+  input) across the change.
+
+### Grids and spacing
+m3.material.io/foundations/layout/grids-spacing (overview, grids,
+spacing, density) and styles/spacing.
+
+- **Columns** (`TashilBreakpoint.columns`, `ColumnGrid`): 4 on compact,
+  8 on medium and expanded, 12 from large (our choice; M3 shows only 4
+  and 8). Gutters equal the margin (16 / 24). `ColumnGrid.span(n)` sizes
+  cards and fields so their edges land on columns; `start(i)` is the
+  content ruler that titles and leading icons align to (the app bar title
+  starts on the same ruler as the content under it). `ColumnGridOverlay`
+  shows the grid for checking. Bars and rails sit outside the grid
+  (placed first, nearest the edges); panes and their content use it.
+- **Spacing units**: the base unit is 8dp; `TashilSpacing` also has 4dp
+  half steps for icons and dense controls. **Padding** is inside an
+  element, **gaps** are between elements, **margins** are outside. Put
+  padding and gaps on the parent (`Column(spacing:)`, `Row(spacing:)`)
+  instead of margins on each child. Leading and trailing swap in RTL, so
+  always use `EdgeInsetsDirectional`.
+- **What spacing does**: groups content, **explicitly** (outline, divider,
+  shadow, card) or **implicitly** (proximity: related things closer
+  together); and directs attention through **rhythm** (the same space for
+  the same relation everywhere), **similarity** (same thumbnail sizes,
+  leading images and icons aligned), **proximity** (a button next to what
+  it changes) and **continuity** (a row of chips reads as one control).
+- **Expression**: the most important content gets the most generous space
+  and the brightest surface; keep one focal point per view and leave
+  negative space instead of filling every gap. Desktop (admin panel) can
+  be more generous than the POS phone.
+- **Density** (`TashilDensity`, `DensityScope`): 0, -1, -2, -3; each step
+  takes 4dp off top and bottom padding or height, text size never
+  changes. **Opt-in only**: a setting the person chooses (the setting's
+  own controls stay at 48dp); never change density automatically by
+  breakpoint or orientation. Only for information-dense screens: lists,
+  tables, long forms (inventory, reports, stock count). Never for focused
+  tasks and alerts: menus, dialogs, snackbars. Touch targets stay 48dp
+  even when the visual shrinks: `DensityScope` densifies list rows (one
+  line stops at 48dp), text fields and data table rows (52dp, never under
+  48), and leaves buttons, checkboxes and switches at standard density
+  because Flutter would shrink their targets.
+- dp = px × 160 / dpi.
 
 ### Components
 | Need | Use | Rule |
@@ -833,6 +897,34 @@ customization, design tokens, inputs, selection). Full notes in Arabic: the
 - App locale is `ar_EG`, which makes the whole tree RTL and translates built-in
   widgets (date picker, time picker, text selection).
 - Strings are Arabic in the UI. Code, identifiers and comments stay English.
+- **Mirroring** (m3.material.io/foundations/layout/bidirectionality-rtl):
+  the layout reverses; reading starts top right. Always use start/end
+  (`EdgeInsetsDirectional`, `AlignmentDirectional`,
+  `PositionedDirectional`), never left/right, so mirroring is free.
+  Navigation rail, expanded rail and the first pane are on the right;
+  app bars, toolbars (tool order and FAB side), chips (trailing icon on
+  the left), text field icons and badges (top left of the icon) mirror.
+- **Text**: Arabic content needs RTL alignment *and* direction, or the
+  word order breaks. LTR runs inside Arabic (phone, email, URL, barcode,
+  invoice number, IBAN) are isolated with `Bidi.ltr()`; text the person
+  typed (a name that may be English) with `Bidi.auto()`. Never reverse an
+  email's user and domain. Fields that hold LTR content set
+  `textDirection: TextDirection.ltr` (or sit in an `LtrIsland`).
+- **Icons**: directional icons mirror (back, forward, send, logout).
+  `Icon` mirrors the ones Flutter marks `matchTextDirection`; use
+  `MirroredIcon` for the rest. Clocks, refresh and other clockwise
+  arrows, check marks and logos never mirror. Help (?) stays as is in
+  Arabic (only Urdu and Persian mirror it).
+- **Time**: linear time mirrors (linear progress fills from the right,
+  timelines run right to left); circular time does not (circular
+  progress and clocks turn clockwise). Media controls and their progress
+  are always LTR (`LtrIsland`). On a 12-hour clock ص/م sit on the left;
+  the time itself stays LTR.
+- **Charts**: in Arabic they mirror like the rest of the layout (only
+  Persian and Urdu keep LTR charts).
+- **Gestures**: swipes mirror. Use `DismissDirection.startToEnd` /
+  `endToStart`, never left/right, so a swipe to delete from the right in
+  English is from the left in Arabic. Predictive back mirrors too.
 
 ## M3 Expressive components Flutter does not ship yet
 M3 Expressive (May 2025) added components that only Jetpack Compose and
