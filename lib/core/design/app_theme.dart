@@ -82,6 +82,10 @@ abstract final class TashilTheme {
       // later; it is the official opt-in until then.
       // ignore: deprecated_member_use
       progressIndicatorTheme: const ProgressIndicatorThemeData(year2023: false),
+      // Same opt-in for the 2024 slider: handle that narrows while pressed,
+      // track gap, stop indicators, value label above the handle.
+      // ignore: deprecated_member_use
+      sliderTheme: const SliderThemeData(year2023: false),
       datePickerTheme: DatePickerThemeData(
         headerHeadlineStyle: text.headlineSmall,
         rangePickerHeaderHeadlineStyle: text.headlineSmall,

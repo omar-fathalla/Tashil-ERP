@@ -94,6 +94,7 @@ so you can check any component under each condition.
 | Values the user types (extra barcodes, tags) | `InputChipField` | Enter or comma adds; Backspace selects then deletes; ✕ at the end |
 | System suggestions (recent searches) | `ActionChip` without icon (suggestion) | Nouns or short phrases |
 | Read-only state (stock, sync) | `StockBadge`, `SyncStatusLabel` | Not chips: M3 chips are always interactive |
+| A value from a range with immediate effect (discount %, volume, print darkness) | `TashilSlider`; `CenteredSlider` around a middle default; `RangeSlider` for min and max | 2024 slider look from the theme; sizes XS to XL; inset icon only from M |
 | Date in a form | `DateField` | Typed in the field (day/month/year, Arabic digits accepted) + calendar button: modal on compact, docked from 600dp |
 | Report period | `ButtonGroup` presets + `showDateRangePicker` (calendar only) for a custom range | Full screen on compact |
 | Time in a form | `ScrollTimePicker` inline | Keyboard toggle always present; 12/24h from the device |
@@ -178,6 +179,37 @@ Source: **m3.material.io/components/dialogs/guidelines**. Code:
   Field errors inline; a dialog only when saving fails. Closing with edits
   asks "تتجاهل التعديلات؟".
 - Long content scrolls inside; title and buttons stay fixed.
+
+### Sliders
+Source: **m3.material.io/components/sliders/guidelines**. Code:
+`lib/core/design/widgets/sliders.dart`; the theme opts into Flutter's 2024
+slider (`SliderThemeData(year2023: false)`). Live: playground tab
+"المدخلات", section "المنزلق".
+
+- For picking from a range where the change **takes effect immediately**
+  (people see the effect while moving it). Not for exact numbers: pair
+  it with a text field, or use a text field instead.
+- Variants: **standard** (starts from zero: discount, volume),
+  **centered** (default in the middle: price change -20% to +20%),
+  **range** (minimum and maximum: price filter). Range is horizontal only.
+- Handle: a bar that narrows while pressed or dragged. Value label above
+  it while dragging (one at a time on a range slider). If the value is
+  shown elsewhere, for example in a text field, the field comes right
+  after the slider in Tab order and both stay in sync.
+- Stop indicators come from `divisions`; the handle snaps to the nearest
+  one. Keep them few. Plus and minus buttons, or text, at the ends can
+  replace stops and help accessibility.
+- Sizes (track height): XS 16, S 24, M 40, L 56, XL 96. Active and
+  inactive tracks are always the same size. XL only for hero moments.
+- Inset icon: only on M, L and XL standard sliders. It moves to the
+  inactive track when there is no room, and can change at zero (volume
+  to mute). Never on centered or range sliders.
+- Vertical: minimum at the bottom, also in Arabic.
+- RTL: values grow from right to left (Flutter does this).
+- Keyboard: Tab focuses the handle, arrows move one step. Flutter has no
+  "Space + arrows" larger step yet.
+- Hand-built: sizes, inset icon, centered track and vertical wrapper.
+  The slider itself is Flutter's.
 
 ### Dates and times
 Sources: **m3.material.io/components/date-pickers/guidelines** and
@@ -462,6 +494,7 @@ page, and replace it with Flutter's version once it lands.
 | Scroll field (snapping wheel, keyboard input, 3 sizes) | `ScrollField` in `widgets/scroll_field.dart`, on the official `ListWheelScrollView` | m3.material.io/components/scroll-fields/guidelines |
 | Side sheets (modal + standard, detached, drag-to-close with predictive back look) | `widgets/side_sheets.dart`, composed from `showGeneralDialog`, `Material`, `AnimatedContainer` | m3.material.io/components/side-sheets/guidelines |
 | Bottom sheet handle that cycles heights, full-screen close bar | `widgets/sheets.dart`, on the official `showModalBottomSheet` + `DraggableScrollableSheet` | m3.material.io/components/bottom-sheets/guidelines |
+| Slider sizes, inset icon, centered variant, vertical | `widgets/sliders.dart`, on the official `Slider` (2024 look) | m3.material.io/components/sliders/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component

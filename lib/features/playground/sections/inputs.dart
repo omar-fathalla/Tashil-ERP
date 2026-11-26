@@ -7,6 +7,7 @@ import '../../../core/design/widgets/menus.dart';
 import 'common.dart';
 import 'scroll_fields_demo.dart';
 import 'search_demo.dart';
+import 'sliders_demo.dart';
 
 class InputsSection extends StatefulWidget {
   const InputsSection({super.key});
@@ -22,7 +23,6 @@ class _InputsSectionState extends State<InputsSection> {
   String _pay = 'cash';
   String? _vendor;
   final Set<String> _columns = {'الكمية', 'سعر البيع'};
-  double _slider = 20;
   final Set<String> _filters = {'قليل المخزون'};
   String _choice = 'اليوم';
   final Set<String> _row = {'بقالة'};
@@ -539,19 +539,16 @@ class _InputsSectionState extends State<InputsSection> {
           ),
         ],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'المنزلق',
-        m3: 'Slider',
-        spec: 'components/sliders',
-        children: [
-          Slider(
-            value: _slider,
-            max: 100,
-            divisions: 20,
-            label: '${_slider.round()}%',
-            onChanged: (v) => setState(() => _slider = v),
-          ),
-        ],
+        m3: 'Sliders',
+        spec: 'components/sliders/guidelines',
+        rule:
+            'التغيير بيبان فوراً وانت بتحرك. Standard من الصفر، Centered '
+            'لما الافتراضي في النص، Range لحد أدنى وأقصى (أفقي بس). نقط '
+            'توقف قليلة. أيقونة جوه المسار من M وأكبر بس، ومش في centered '
+            'أو range. XL للحظات المهمة بس.',
+        children: [SlidersDemo()],
       ),
       SpecSection(
         title: 'التاريخ',
