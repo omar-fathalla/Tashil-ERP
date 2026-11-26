@@ -958,6 +958,10 @@ page, and replace it with Flutter's version once it lands.
    at 360 dp and fails on overflow).
 
 ## Updating from M3 pages (standing rule)
+Every item has a fixed ID in `docs/m3-catalog.md` (F foundations, C
+components, P Tashil composites). Follow its "How to review an M3 page"
+steps and update the matching rows.
+
 The product owner collects official M3 pages (m3.material.io links or
 screenshots) and sends them in. Every time one arrives, without waiting
 for a separate request:
