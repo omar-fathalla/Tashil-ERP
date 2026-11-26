@@ -12,6 +12,7 @@ import 'common.dart';
 import 'sheets_demo.dart';
 import 'side_sheets_demo.dart';
 import 'snackbars_demo.dart';
+import 'tooltips_demo.dart';
 
 class FeedbackSection extends StatelessWidget {
   const FeedbackSection({super.key});
@@ -226,19 +227,17 @@ class FeedbackSection extends StatelessWidget {
             'لحد ما التحديث يخلص.',
         children: [_PullToRefreshDemo()],
       ),
-      SpecSection(
+      const SpecSection(
         title: 'التلميح',
         m3: 'Tooltip',
-        spec: 'components/tooltips',
-        rule: 'كل IconButton لازم يكون ليه tooltip (وصول + توضيح).',
-        children: [
-          Demo([
-            Tooltip(
-              message: 'مزامنة الآن',
-              child: IconButton(onPressed: () {}, icon: const Icon(Icons.sync)),
-            ),
-          ]),
-        ],
+        spec: 'components/tooltips/guidelines',
+        rule:
+            'العادي: سطر قصير لأي زرار أيقونة بس، فوق العنصر بـ 4 (و8 من '
+            'نص عادي)، وتحته في شريط التطبيق. الغني: عنوان سطر واحد + شرح + '
+            'زرارين نصيين بالكتير جنب بعض، تحت العنصر ناحية النهاية ومش '
+            'بيغطيه. الاتنين بيختفوا بعد 1.5 ثانية، وواحد بس في المرة. الثابت '
+            'بيفتح بالضغط ومش على زرار أيقونة. مفيش معلومة مهمة في تلميح.',
+        children: [TooltipsDemo()],
       ),
       SpecSection(
         title: 'اللافتة',

@@ -104,6 +104,8 @@ so you can check any component under each condition.
 | Main navigation on the device | `HidingNavigationBar` (official `NavigationBar`) | 3 to 5 destinations, labels always, 64dp, hides on scroll down |
 | Wide screens (600 dp and up) | `TashilNavigationRail` (official `NavigationRail`) | Collapsed 96dp; menu button expands it; FAB under the menu button |
 | Secondary destinations | Expanded rail; on compact `ModalNavigationRail` from the app bar menu | `NavigationDrawer` is no longer recommended by M3: do not use it |
+| Name of an icon-only button | `tooltip:` on `IconButton` (plain tooltip from the theme) | One short line; not on elements that already have text |
+| Explain a term or a new feature | `RichTooltip` (transient, or `persistent: true` on tap) | One-line subhead, up to two text buttons; never critical information |
 | Confirm an irreversible action | `AlertDialog` via `showTashilDialog` | Text buttons; confirm says what happens ("إلغاء الفاتورة") |
 | Acknowledge (printer out of paper) | `AlertDialog`, one action | Only acknowledgement dialogs have a single button |
 | Pick one item (return reason) | `showChoiceDialog` | Title and buttons pinned, list scrolls, confirm disabled until a choice |
@@ -269,6 +271,31 @@ official `SnackBar` and `ScaffoldMessenger`). Live: playground tab
   600dp it is centred, at most 560dp wide, never flush to an edge.
 - Also show the result where the action happened (the save button turns
   into "اتحفظ"), so people who miss the snackbar still see it.
+
+### Tooltips
+Source: **m3.material.io/components/tooltips/guidelines**. Code:
+`lib/core/design/widgets/tooltips.dart` (`plainTooltipTheme` in the app
+theme, `appBarTooltipTheme`, `RichTooltip`, `RichTooltipController`).
+Live: playground tab "التنبيهات", section "التلميح".
+
+- **Plain** (Flutter's `Tooltip`, also `IconButton.tooltip`): labels
+  elements with no text, mostly icon-only buttons. One short line. Not
+  needed when the element already has a text label.
+- Placement: above the element, 4dp from an element with a boundary (a
+  button), 8dp from bare text. In an app bar, below the element
+  (wrap the app bar in `TooltipTheme(data: appBarTooltipTheme)`).
+- **Rich** (`RichTooltip`, hand-built: Flutter has no rich tooltip yet):
+  optional subhead (one line, needed when it opens by itself), supporting
+  text, up to two short text buttons side by side. Placed below the
+  element towards the end side (bottom right; bottom left in Arabic),
+  never covering it, moved in 8dp steps to stay on screen, above the
+  element when there is no room below.
+- Showing: long press on mobile, hover on desktop. Both kinds disappear
+  1.5 s after leaving. Only one tooltip at a time.
+- **Persistent rich**: opens on tap, or from `RichTooltipController` to
+  introduce a new feature when the page opens. Stays until the person
+  taps elsewhere. Never on icon buttons.
+- Never hide critical information in a tooltip: use a dialog.
 
 ### Dates and times
 Sources: **m3.material.io/components/date-pickers/guidelines** and
@@ -554,6 +581,7 @@ page, and replace it with Flutter's version once it lands.
 | Side sheets (modal + standard, detached, drag-to-close with predictive back look) | `widgets/side_sheets.dart`, composed from `showGeneralDialog`, `Material`, `AnimatedContainer` | m3.material.io/components/side-sheets/guidelines |
 | Bottom sheet handle that cycles heights, full-screen close bar | `widgets/sheets.dart`, on the official `showModalBottomSheet` + `DraggableScrollableSheet` | m3.material.io/components/bottom-sheets/guidelines |
 | Slider sizes, inset icon, centered variant, vertical | `widgets/sliders.dart`, on the official `Slider` (2024 look) | m3.material.io/components/sliders/guidelines |
+| Rich tooltip (subhead, buttons, transient and persistent, dynamic placement) | `RichTooltip` in `widgets/tooltips.dart`, on the official `RawTooltip` and `OverlayPortal` | m3.material.io/components/tooltips/guidelines |
 | Menu gaps, vibrant colour style, selected highlight | `groupedMenuChildren`, `MenuOption` in `widgets/menus.dart`, composed from the official `MenuAnchor` + `MenuItemButton` | m3.material.io/components/menus/guidelines |
 
 ## Adding a component

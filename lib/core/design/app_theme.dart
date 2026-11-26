@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'motion.dart';
 import 'tokens.dart';
+import 'widgets/tooltips.dart';
 
 /// Builds the single Material 3 theme used by the app and the playground.
 ///
@@ -65,6 +66,7 @@ abstract final class TashilTheme {
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(),
       ),
+      tooltipTheme: plainTooltipTheme,
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
       ),
