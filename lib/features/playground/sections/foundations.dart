@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
+import 'color_roles_demo.dart';
 import 'common.dart';
 
 class FoundationsSection extends StatelessWidget {
@@ -10,29 +11,7 @@ class FoundationsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme;
-    final sem = TashilSemanticColors.of(context);
     final text = Theme.of(context).textTheme;
-
-    final roles = <(String, Color, Color)>[
-      ('primary', s.primary, s.onPrimary),
-      ('primaryContainer', s.primaryContainer, s.onPrimaryContainer),
-      ('secondary', s.secondary, s.onSecondary),
-      ('secondaryContainer', s.secondaryContainer, s.onSecondaryContainer),
-      ('tertiary', s.tertiary, s.onTertiary),
-      ('tertiaryContainer', s.tertiaryContainer, s.onTertiaryContainer),
-      ('error', s.error, s.onError),
-      ('errorContainer', s.errorContainer, s.onErrorContainer),
-      ('success *', sem.success, sem.onSuccess),
-      ('successContainer *', sem.successContainer, sem.onSuccessContainer),
-      ('warning *', sem.warning, sem.onWarning),
-      ('warningContainer *', sem.warningContainer, sem.onWarningContainer),
-      ('surface', s.surface, s.onSurface),
-      ('surfaceContainerLow', s.surfaceContainerLow, s.onSurface),
-      ('surfaceContainer', s.surfaceContainer, s.onSurface),
-      ('surfaceContainerHigh', s.surfaceContainerHigh, s.onSurface),
-      ('surfaceContainerHighest', s.surfaceContainerHighest, s.onSurface),
-      ('inverseSurface', s.inverseSurface, s.onInverseSurface),
-    ];
 
     final styles = <(String, TextStyle?)>[
       ('displaySmall', text.displaySmall),
@@ -50,27 +29,17 @@ class FoundationsSection extends StatelessWidget {
     ];
 
     return SectionList([
-      SpecSection(
+      const SpecSection(
         title: 'الألوان',
+        m3: 'Color roles · color system',
         spec: 'styles/color/roles',
         rule:
-            'كل الألوان من ColorScheme المتولد من لون البذرة. '
-            'العناصر بعلامة * امتداد خاص بتسهيل (نجاح/تحذير).',
-        children: [
-          for (final (name, bg, fg) in roles)
-            Container(
-              height: 44,
-              margin: const EdgeInsets.only(bottom: 2),
-              padding: const EdgeInsets.symmetric(horizontal: TashilSpacing.md),
-              alignment: AlignmentDirectional.centerStart,
-              color: bg,
-              child: Text(
-                name,
-                style: text.labelLarge?.copyWith(color: fg),
-                textDirection: TextDirection.ltr,
-              ),
-            ),
-        ],
+            'كل الألوان أدوار من ColorScheme المتولد من لون البذرة، ومفيش '
+            'لون hex في أي شاشة. استخدم كل دور مع الـ on بتاعه بس (ده اللي '
+            'بيضمن التباين). الـ container للخلفيات مش للكلام. 3 مستويات '
+            'تباين (زرار التباين فوق): عادي، متوسط، عالي، والعالي بيشتغل '
+            'لوحده لو الجهاز طالبه. الرقم جنب كل لون هو التباين.',
+        children: [ColorRolesDemo()],
       ),
       SpecSection(
         title: 'الخطوط',

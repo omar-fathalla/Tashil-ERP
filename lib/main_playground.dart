@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'core/design/app_localizations.dart';
 import 'core/design/app_theme.dart';
+import 'core/design/tokens.dart';
 import 'features/playground/playground_screen.dart';
 
 /// Standalone entry point for the component playground, no database needed:
@@ -18,6 +19,9 @@ class PlaygroundApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: TashilTheme.light(),
     darkTheme: TashilTheme.dark(),
+    // System high-contrast setting (M3: three contrast levels).
+    highContrastTheme: TashilTheme.light(contrast: TashilContrast.high),
+    highContrastDarkTheme: TashilTheme.dark(contrast: TashilContrast.high),
     locale: TashilLocale.arabic,
     supportedLocales: TashilLocale.supported,
     localizationsDelegates: TashilLocale.delegates,

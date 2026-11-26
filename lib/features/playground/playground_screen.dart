@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/design/app_theme.dart';
+import '../../core/design/tokens.dart';
 import 'sections/actions.dart';
 import 'sections/containment.dart';
 import 'sections/feedback.dart';
@@ -36,12 +37,21 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
   bool? _dark; // null = follow the app / system
   bool _rtl = true;
   bool _largeText = false;
+  var _contrast = TashilContrast.standard;
+
+  static const _contrastNames = {
+    TashilContrast.standard: 'عادي',
+    TashilContrast.medium: 'متوسط',
+    TashilContrast.high: 'عالي',
+  };
 
   @override
   Widget build(BuildContext context) {
     final appDark = Theme.of(context).brightness == Brightness.dark;
     final dark = _dark ?? appDark;
-    final theme = dark ? TashilTheme.dark() : TashilTheme.light();
+    final theme = dark
+        ? TashilTheme.dark(contrast: _contrast)
+        : TashilTheme.light(contrast: _contrast);
     final media = MediaQuery.of(context);
 
     return Theme(
@@ -79,6 +89,17 @@ class _PlaygroundScreenState extends State<PlaygroundScreen> {
                       selectedIcon: const Icon(
                         Icons.format_textdirection_l_to_r,
                       ),
+                    ),
+                    IconButton(
+                      // Cycles the three M3 contrast levels.
+                      tooltip: 'التباين: ${_contrastNames[_contrast]}',
+                      isSelected: _contrast != TashilContrast.standard,
+                      onPressed: () => setState(
+                        () => _contrast =
+                            TashilContrast.values[(_contrast.index + 1) %
+                                TashilContrast.values.length],
+                      ),
+                      icon: const Icon(Icons.contrast),
                     ),
                     IconButton(
                       tooltip: 'تكبير الخط',

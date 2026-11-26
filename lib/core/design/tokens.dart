@@ -10,9 +10,40 @@ abstract final class TashilColors {
   static const seed = Color(0xFF0B6E4F);
 
   /// Semantic colours M3 does not ship (M3 only has `error`). Use them through
-  /// [TashilSemanticColors], which harmonises them for light and dark.
+  /// [TashilSemanticColors], which turns each into a tonal set for light,
+  /// dark and every contrast level. Like `error` they are static: they keep
+  /// their meaning (green, orange) and are not pulled towards the seed.
   static const success = Color(0xFF2E7D32);
   static const warning = Color(0xFFB26A00);
+}
+
+/// The three M3 contrast levels (May 2025). Every colour role, including
+/// [TashilSemanticColors], is regenerated for the chosen level, so screens
+/// that only use roles in their intended pairs support all three.
+enum TashilContrast {
+  /// Default: mixed contrast that keeps the visual hierarchy.
+  standard(0),
+
+  /// At least 3:1 everywhere (outline variant too), for people who need
+  /// more contrast but find high contrast uncomfortable.
+  medium(0.5),
+
+  /// About 7:1 for text and icons; also used when the system asks for high
+  /// contrast (`MaterialApp.highContrastTheme`).
+  high(1);
+
+  const TashilContrast(this.level);
+
+  /// Value for `ColorScheme.fromSeed(contrastLevel:)`.
+  final double level;
+}
+
+/// WCAG contrast ratio between two colours (1 to 21).
+double contrastRatio(Color a, Color b) {
+  final x = a.computeLuminance();
+  final y = b.computeLuminance();
+  final (hi, lo) = x > y ? (x, y) : (y, x);
+  return (hi + 0.05) / (lo + 0.05);
 }
 
 /// 4dp grid. Use these instead of literal paddings.
@@ -96,9 +127,15 @@ class TashilSemanticColors extends ThemeExtension<TashilSemanticColors> {
     required this.onWarningContainer,
   });
 
-  factory TashilSemanticColors.forBrightness(Brightness brightness) {
-    ColorScheme from(Color seed) =>
-        ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+  factory TashilSemanticColors.forBrightness(
+    Brightness brightness, {
+    TashilContrast contrast = TashilContrast.standard,
+  }) {
+    ColorScheme from(Color seed) => ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: brightness,
+      contrastLevel: contrast.level,
+    );
     final s = from(TashilColors.success);
     final w = from(TashilColors.warning);
     return TashilSemanticColors(

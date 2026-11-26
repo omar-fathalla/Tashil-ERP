@@ -14,13 +14,22 @@ abstract final class TashilTheme {
   /// the app looks the same offline on first launch.
   static const fontFamily = 'Cairo';
 
-  static ThemeData light() => _build(Brightness.light);
-  static ThemeData dark() => _build(Brightness.dark);
+  /// [contrast] follows the M3 contrast levels; the app passes
+  /// [TashilContrast.high] for `highContrastTheme` (system setting) and
+  /// may offer medium and high as an in-app choice.
+  static ThemeData light({TashilContrast contrast = TashilContrast.standard}) =>
+      _build(Brightness.light, contrast);
+  static ThemeData dark({TashilContrast contrast = TashilContrast.standard}) =>
+      _build(Brightness.dark, contrast);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, TashilContrast contrast) {
+    // Static scheme from the brand seed with the default tonal-spot
+    // algorithm (M3 "hand-picked source colour"). No wallpaper colour: a
+    // shared shop device should look the same for every cashier.
     final scheme = ColorScheme.fromSeed(
       seedColor: TashilColors.seed,
       brightness: brightness,
+      contrastLevel: contrast.level,
     );
     final base = ThemeData(
       colorScheme: scheme,
@@ -37,7 +46,9 @@ abstract final class TashilTheme {
     return base.copyWith(
       textTheme: text,
       primaryTextTheme: _withWeightAxis(base.primaryTextTheme),
-      extensions: [TashilSemanticColors.forBrightness(brightness)],
+      extensions: [
+        TashilSemanticColors.forBrightness(brightness, contrast: contrast),
+      ],
       appBarTheme: const AppBarTheme(centerTitle: false),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
